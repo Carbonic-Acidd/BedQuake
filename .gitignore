@@ -1,0 +1,15 @@
+# Secrets
+firmware/src/secrets.py
+.env
+
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store

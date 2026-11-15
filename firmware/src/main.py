@@ -1,0 +1,1 @@
+print("BedQuake firmware starting")
