@@ -1,5 +1,4 @@
-# Secrets
-firmware/src/secrets.py
+# Secrets (covers firmware/.env and any other .env)
 .env
 
 # Node
