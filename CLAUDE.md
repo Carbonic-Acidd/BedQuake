@@ -21,6 +21,7 @@ Roadmap and MQTT topics contract: PLAN.md. See README.md for every file's job.
 - One root .env (gitignored; template .env.example) holds everything.
 - Pico: scripts/gen_pico_env.py writes pico/env.py (gitignored) from .env.
 - Website: Vite reads the root .env (envDir '..'); only VITE_ vars reach the browser.
+  The website's broker password is typed into the page (localStorage), never a VITE_ var.
 
 ## Hardware facts (don't change without asking)
 - Power: 24 V adapter -> amp VCC, and buck converter (5 V) -> Pico.

@@ -4,6 +4,7 @@ import { connect, test, stop, setAlarm, clearAlarm } from './mqtt.js'
 
 const TEST_SECONDS = 10           // how long a test button plays
 const CONFIRM_TIMEOUT_MS = 5000   // how long to wait for the Pico to confirm an alarm change
+const PASSWORD_KEY = 'bedquake-mqtt-password'   // where this device remembers the password
 
 const $ = (id) => document.getElementById(id)
 let shownPatterns = ''   // the pattern names the buttons were built from
@@ -83,6 +84,33 @@ function onSetAlarm() {
   send({ time, pattern: $('alarm-pattern').value })
 }
 
+// The password is typed in once and remembered on this device, so it's never in the site.
+// (localStorage can be blocked, e.g. in private browsing; then it's asked for each visit.)
+function savedPassword() {
+  try { return localStorage.getItem(PASSWORD_KEY) } catch { return null }
+}
+function rememberPassword(password) {
+  try { password ? localStorage.setItem(PASSWORD_KEY, password) : localStorage.removeItem(PASSWORD_KEY) } catch {}
+}
+
+function start(password) {
+  $('login').hidden = true
+  connect(password, showStatus, (text) => {
+    $('connection').textContent = 'Broker: ' + text
+    if (text === 'wrong password') {
+      rememberPassword(null)
+      $('login-note').textContent = 'Wrong password, try again.'
+      $('login').hidden = false
+    }
+  })
+}
+
+$('login').onsubmit = (event) => {
+  event.preventDefault()
+  rememberPassword($('password').value)
+  start($('password').value)
+}
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
 
 if (!import.meta.env.VITE_MQTT_URL) {
@@ -91,6 +119,7 @@ if (!import.meta.env.VITE_MQTT_URL) {
   $('stop').onclick = stop
   $('alarm-set').onclick = onSetAlarm
   $('alarm-clear').onclick = () => send(null)
-  connect(showStatus, (text) => { $('connection').textContent = 'Broker: ' + text })
+  if (savedPassword()) start(savedPassword())
+  else $('login').hidden = false
 }
 render()

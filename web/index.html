@@ -40,6 +40,13 @@
   <main>
     <h1><img src="/logo.png" alt="BedQuake" width="640" height="371"></h1>
 
+    <form id="login" class="card" hidden>
+      <h2>Broker password</h2>
+      <p id="login-note" class="small">Enter the website's EMQX password. This device will remember it.</p>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button>Connect</button>
+    </form>
+
     <section class="card">
       <h2>Pico</h2>
       <p id="pico" class="offline">Waiting for the Pico...</p>

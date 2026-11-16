@@ -9,12 +9,18 @@ const SET_TOPIC = 'bedquake/alarm/set'
 let client
 
 // onStatus(status) gets each status message from the Pico.
-// onConnection(text) gets 'connecting', 'connected' or 'disconnected'.
-export function connect(onStatus, onConnection) {
+// onConnection(text) gets 'connecting', 'connected', 'disconnected' or 'wrong password'.
+export function connect(password, onStatus, onConnection) {
   onConnection('connecting')
   client = mqtt.connect(import.meta.env.VITE_MQTT_URL, {
     username: import.meta.env.VITE_MQTT_USER,
-    password: import.meta.env.VITE_MQTT_PASS,
+    password,
+  })
+  client.on('error', (error) => {
+    if (error.code === 4 || error.code === 5) {   // bad username/password, or not authorized
+      client.end(true)   // stop retrying with a wrong password
+      onConnection('wrong password')
+    }
   })
   client.on('connect', () => {
     onConnection('connected')

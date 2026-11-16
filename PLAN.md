@@ -45,9 +45,9 @@ end to end.
 Check: on the phone, "Add to Home Screen" opens BedQuake full screen with its icon;
 then, on mobile data, set an alarm and feel it fire.
 
-Security note: VITE_ values are readable by anyone who loads the site. Give the website
-its own EMQX login, and consider typing the password into the page instead of
-building it in.
+Security: VITE_ values are readable by anyone who loads the site, so only the broker URL
+and the website's username are VITE_ values. The website's password is typed into the
+page once and remembered on that device; it is never in the repo or the deployed site.
 
 ## MQTT topics (the contract between the Pico and the website)
 Times are UTC Unix seconds. Payloads are JSON.
