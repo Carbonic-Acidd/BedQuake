@@ -37,4 +37,4 @@ make pico-setup          # once per Pico, with the Pico plugged in
 - `web/src/mqtt.js`: talks to the broker.
 - `web/public/manifest.webmanifest`: lets the phone install the site as an app.
 - `web/public/sw.js`: service worker; opens the last loaded page when offline.
-- `web/public/*.png`: app icons (home screen and install).
+- `web/public/*.png`: the logo (page header) and app icons (home screen and install).

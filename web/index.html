@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#111111">
+  <meta name="theme-color" content="#030b1e">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon-192.png">
   <!-- iPhone: home screen icon, name, and full-screen launch -->
@@ -13,11 +13,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <title>BedQuake</title>
   <style>
-    body { margin: 0; background: #111; color: #eee; font: 18px system-ui, sans-serif; }
+    body { margin: 0; background: #030b1e; color: #eee; font: 18px system-ui, sans-serif; }
     main { max-width: 420px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 16px; }
     h1, h2, p { margin: 0; }
+    h1 img { display: block; width: 220px; max-width: 70%; height: auto; margin: 0 auto; }
     h2 { font-size: 14px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; }
-    .card { display: grid; gap: 8px; padding: 16px; border-radius: 16px; background: #1c1c1c; }
+    .card { display: grid; gap: 8px; padding: 16px; border-radius: 16px; background: #0c1631; }
     #pico { font-size: 24px; font-weight: 700; }
     #pico::before { content: '●'; margin-right: 8px; }
     #pico.online { color: #5d5; }
@@ -26,18 +27,18 @@
     .small { color: #999; font-size: 14px; }
     #alarm-pending { color: #e5b83b; font-size: 15px; }
     #patterns, .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    button { min-height: 64px; border: 0; border-radius: 12px; background: #333; color: #eee;
+    button { min-height: 64px; border: 0; border-radius: 12px; background: #1c2a4d; color: #eee;
              font: inherit; text-transform: capitalize; }
-    button.playing { background: #2a6fdb; }
+    button.playing { background: #5aa2fe; color: #030b1e; }
     button:disabled { opacity: 0.4; }
     #stop { min-height: 88px; background: #c33; font-size: 24px; font-weight: 700; }
-    input, select { min-height: 48px; border: 1px solid #444; border-radius: 12px; background: #222;
+    input, select { min-height: 48px; border: 1px solid #2a3a63; border-radius: 12px; background: #101d3d;
                     color: #eee; font: inherit; padding: 0 12px; text-transform: capitalize; }
   </style>
 </head>
 <body>
   <main>
-    <h1>BedQuake</h1>
+    <h1><img src="/logo.png" alt="BedQuake" width="640" height="371"></h1>
 
     <section class="card">
       <h2>Pico</h2>
