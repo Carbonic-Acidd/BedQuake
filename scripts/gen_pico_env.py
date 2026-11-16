@@ -28,8 +28,7 @@ for key in PICO_KEYS:
         value = int(value)
     lines.append(f"{key} = {value!r}\n")
 
-OUT_FILE.write_text("".join(lines), encoding="utf-8")
-# Step 1 allows blanks so the shaker works before HiveMQ is set up. Step 2 makes them required.
 if missing:
-    print("Warning: not set in .env, written as None:", ", ".join(missing))
+    sys.exit("Fill these in .env first: " + ", ".join(missing))
+OUT_FILE.write_text("".join(lines), encoding="utf-8")
 print("Wrote pico/env.py")

@@ -1,7 +1,7 @@
 # BedQuake
 
 Silent bed-shaker alarm. Pico WH (MicroPython) -> TPA3116 amp -> bass shaker.
-PWA website (Vite, plain JS, hosted on Vercel) <-> HiveMQ Cloud MQTT <-> Pico.
+PWA website (Vite, plain JS, hosted on Vercel) <-> EMQX Serverless MQTT broker (TLS only) <-> Pico.
 Team final project for Northeastern's Cornerstone of Engineering.
 Roadmap and MQTT topics contract: PLAN.md. See README.md for every file's job.
 

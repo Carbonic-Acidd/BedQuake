@@ -1,7 +1,7 @@
 # BedQuake
 
 A silent bed-shaker alarm. A Raspberry Pi Pico WH drives a bass shaker through an
-amp, and (soon) a phone web app controls it over MQTT through HiveMQ Cloud.
+amp, and (soon) a phone web app controls it over MQTT through an EMQX Serverless broker.
 
 ## Prerequisites
 Python 3, Node LTS, and Make. On Windows: `winget install GnuWin32.Make`, or use Git Bash.

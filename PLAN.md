@@ -7,17 +7,17 @@ eyes or ears. Do one step at a time.
 New layout, one `.env`, and `make run` plays the shaker patterns. No network yet.
 Check: `make run` and feel the pulse pattern; Ctrl-C stops it.
 
-## 2. Pico joins Wi-Fi and HiveMQ
-`net.py` joins Wi-Fi and connects to HiveMQ Cloud over TLS (port 8883). It publishes a
+## 2. Pico joins Wi-Fi and the broker
+`net.py` joins Wi-Fi and connects to EMQX Serverless over TLS (port 8883). It publishes a
 retained `bedquake/status` with a last-will of `{"online": false}`.
 `gen_pico_env.py` now **requires** the Pico keys and stops if any are blank.
-Check: `make run` prints "connected". In the HiveMQ Cloud web client, `bedquake/status`
-shows online, and unplugging the Pico shows offline within about a minute.
+Check: `make run` prints "connected". In MQTTX Web (mqttx.app/web-client), `bedquake/status`
+shows online, and unplugging the Pico shows offline within about 90 seconds.
 
 ## 3. Pico obeys commands
 The Pico handles `bedquake/alarm/test` (play a pattern by name for N seconds) and
 `bedquake/alarm/stop`.
-Check: publish them from the HiveMQ web client and feel the shaker start and stop.
+Check: publish them from MQTTX Web and feel the shaker start and stop.
 
 Why this is its own step: it tests the Pico side before the website exists, so a
 later bug is clearly in either the Pico or the website, not both.
@@ -43,7 +43,7 @@ end to end.
 Check: from the phone on mobile data, set an alarm and feel it fire.
 
 Security note: VITE_ values are readable by anyone who loads the site. Give the website
-its own HiveMQ credential, and consider typing the password into the page instead of
+its own EMQX login, and consider typing the password into the page instead of
 building it in.
 
 ## MQTT topics (the contract between the Pico and the website)
