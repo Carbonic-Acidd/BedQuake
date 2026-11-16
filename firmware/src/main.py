@@ -1,1 +1,0 @@
-print("BedQuake firmware starting")

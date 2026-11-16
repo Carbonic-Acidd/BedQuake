@@ -1,14 +1,2 @@
-# Secrets (covers firmware/.env and any other .env)
-.env
-
-# Node
-node_modules/
-dist/
-
-# Python
+pico/secrets.py
 __pycache__/
-*.pyc
-.venv/
-
-# OS
-.DS_Store

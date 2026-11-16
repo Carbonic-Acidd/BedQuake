@@ -1,17 +1,16 @@
 # BedQuake
 
-BedQuake is a bed-shaker alarm clock. A Raspberry Pi Pico runs MicroPython
-firmware that drives a vibration shaker under the mattress, reads local inputs
-(an IR sensor and a strength potentiometer), and talks to the outside world over
-MQTT so alarms and vibration patterns can be set from a web app and, later,
-from calendar events.
+A silent bed-shaker alarm. A Raspberry Pi Pico WH drives a bass shaker through an
+amp. A web page toggles it on and off through a public MQTT broker.
 
-## Folders
+## Pico
 
-- `.github/workflows/` - CI workflows (none yet).
-- `docs/` - build plan, test log, and architecture decision records (`docs/decisions/`).
-- `protocol/` - MQTT topic list and JSON Schemas shared by firmware and web.
-- `firmware/` - MicroPython source (`src/`), tests, dev tools, and bench scripts for the Pico.
-- `web/` - web app for setting alarms and patterns (scaffolded in milestone M6).
-- `jobs/calendar/` - calendar-driven alarm jobs (later phase).
-- `hardware/` - schematic, enclosure files, photos, and the bill of materials (`bom.csv`).
+One-time setup: `python -m pip install mpremote`, then copy
+`pico/secrets.example.py` to `pico/secrets.py` and fill it in.
+
+- Try code without saving it: `mpremote run --no-follow pico/main.py + repl`
+  (Ctrl-C stops it on the Pico, Ctrl-] exits). Plain `mpremote run` doesn't pass
+  Ctrl-C to the Pico, so the shaker would keep going.
+- Save to the Pico so it runs on power-up: `mpremote cp pico/main.py pico/secrets.py : + reset`
+
+`pico/shaker_test.py` is a standalone bench test (smooth rumble): `mpremote run pico/shaker_test.py`
