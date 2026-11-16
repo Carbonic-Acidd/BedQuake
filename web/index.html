@@ -9,26 +9,52 @@
   <style>
     body { margin: 0; background: #111; color: #eee; font: 18px system-ui, sans-serif; }
     main { max-width: 420px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 16px; }
-    h1 { margin: 0; }
-    #pico { margin: 0; font-weight: 600; }
+    h1, h2, p { margin: 0; }
+    h2 { font-size: 14px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; }
+    .card { display: grid; gap: 8px; padding: 16px; border-radius: 16px; background: #1c1c1c; }
+    #pico { font-size: 24px; font-weight: 700; }
+    #pico::before { content: '●'; margin-right: 8px; }
     #pico.online { color: #5d5; }
     #pico.offline { color: #e66; }
-    #patterns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    #alarm-now { font-size: 22px; font-weight: 600; }
+    .small { color: #999; font-size: 14px; }
+    #alarm-pending { color: #e5b83b; font-size: 15px; }
+    #patterns, .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     button { min-height: 64px; border: 0; border-radius: 12px; background: #333; color: #eee;
              font: inherit; text-transform: capitalize; }
     button.playing { background: #2a6fdb; }
     button:disabled { opacity: 0.4; }
     #stop { min-height: 88px; background: #c33; font-size: 24px; font-weight: 700; }
-    #connection { margin: 0; color: #888; font-size: 14px; }
+    input, select { min-height: 48px; border: 1px solid #444; border-radius: 12px; background: #222;
+                    color: #eee; font: inherit; padding: 0 12px; text-transform: capitalize; }
   </style>
 </head>
 <body>
   <main>
     <h1>BedQuake</h1>
-    <p id="pico" class="offline">Waiting for the Pico...</p>
+
+    <section class="card">
+      <h2>Pico</h2>
+      <p id="pico" class="offline">Waiting for the Pico...</p>
+      <p id="playing"></p>
+      <p id="connection" class="small"></p>
+    </section>
+
     <div id="patterns"></div>
     <button id="stop" disabled>Stop</button>
-    <p id="connection"></p>
+
+    <section class="card">
+      <h2>The Pico's alarm</h2>
+      <p id="alarm-now">Unknown</p>
+      <p id="alarm-note" class="small"></p>
+      <p id="alarm-pending"></p>
+      <input id="alarm-time" type="datetime-local">
+      <select id="alarm-pattern"></select>
+      <div class="row">
+        <button id="alarm-set">Set alarm</button>
+        <button id="alarm-clear">Clear</button>
+      </div>
+    </section>
   </main>
   <script type="module" src="/src/main.js"></script>
 </body>

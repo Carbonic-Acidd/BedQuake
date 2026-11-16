@@ -4,6 +4,7 @@ import mqtt from 'mqtt'
 const STATUS_TOPIC = 'bedquake/status'
 const TEST_TOPIC = 'bedquake/alarm/test'
 const STOP_TOPIC = 'bedquake/alarm/stop'
+const SET_TOPIC = 'bedquake/alarm/set'
 
 let client
 
@@ -36,4 +37,15 @@ export function test(pattern, seconds) {
 
 export function stop() {
   client.publish(STOP_TOPIC, '{}')
+}
+
+// Retained, so the Pico gets the alarm even if it's offline right now or restarts.
+// QoS 1: the broker confirms it got it, and mqtt.js resends after a dropped connection.
+export function setAlarm(time, pattern) {
+  client.publish(SET_TOPIC, JSON.stringify({ time, pattern }), { retain: true, qos: 1 })
+}
+
+// An empty retained message replaces the stored alarm with "none".
+export function clearAlarm() {
+  client.publish(SET_TOPIC, '', { retain: true, qos: 1 })
 }

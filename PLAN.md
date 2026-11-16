@@ -51,10 +51,14 @@ Times are UTC Unix seconds. Payloads are JSON.
 
 | Topic | Direction | Retained | Example payload |
 |---|---|---|---|
-| `bedquake/status` | Pico -> web | yes (+ last-will) | `{"online": true, "playing": "pulse", "patterns": ["pulse", "breathe", "steady", "heartbeat"], "alarm": 1763290800}`, last-will `{"online": false}` |
-| `bedquake/alarm/test` | web -> Pico | no | `{"pattern": "breathe", "seconds": 10}` |
-| `bedquake/alarm/stop` | web -> Pico | no | `{}` |
-| `bedquake/alarm/set` | web -> Pico | yes | `{"time": 1763290800, "pattern": "pulse"}`; `{"time": null}` clears it |
+| `bedquake/status` | Pico -> web | yes (+ last-will) | `{"online": true, "playing": "pulse", "patterns": ["pulse", "breathe", "steady", "heartbeat"], "alarm": {"time": 1763290800, "pattern": "pulse"}}` (`"alarm": null` when none), last-will `{"online": false}` |
+| `bedquake/alarm/test` | web -> Pico | no | `{"pattern": "breathe", "seconds": 10}` (default 10, max 600) |
+| `bedquake/alarm/stop` | web -> Pico | no | anything, e.g. `{}` |
+| `bedquake/alarm/set` | web -> Pico | yes | `{"time": 1763290800, "pattern": "pulse"}`; an empty message clears it |
+
+Alarms are one-shot: the Pico forgets an alarm once it fires, and skips any alarm more
+than 120 s in the past (so the stale retained `alarm/set` doesn't refire after a restart).
+An alarm plays until Stop, or 600 s at most. The website sends `alarm/set` with QoS 1.
 
 The Pico lists its patterns in `status`, so adding one in `pico/shaker.py` adds a
 button on the website with no web change.

@@ -1,12 +1,13 @@
 """Wi-Fi + MQTT for the Pico. Knows nothing about the shaker.
 
-connect(status, on_message) joins Wi-Fi, connects to the broker over TLS, publishes
-status, and subscribes to the command topics. Then call check() often: it passes each
+connect(status, on_message) joins Wi-Fi, sets the clock from the internet (NTP),
+connects to the broker over TLS, publishes status, and subscribes to the command topics. Then call check() often: it passes each
 incoming message to on_message(topic, payload) and keeps the connection alive.
 """
 import json
 import machine
 import network
+import ntptime
 import rp2
 import ssl
 import time
@@ -19,12 +20,16 @@ import env
 STATUS_TOPIC = "bedquake/status"
 TEST_TOPIC = "bedquake/alarm/test"
 STOP_TOPIC = "bedquake/alarm/stop"
+SET_TOPIC = "bedquake/alarm/set"
 KEEPALIVE_S = 60          # if we go silent this long (x1.5), the broker publishes the last-will
 PING_MS = 30_000          # ping well inside the keepalive
 WIFI_COUNTRY = "US"
 WIFI_POWER_SAVE_OFF = 0xA11140   # Pico W value that turns Wi-Fi power saving off
 WIFI_TIMEOUT_S = 20
 CONNECT_TIMEOUT_S = 10
+
+# The web app sends UTC Unix seconds. Older MicroPython counts time from 2000, not 1970.
+UNIX_OFFSET = 946684800 if time.gmtime(0)[0] == 2000 else 0
 
 _client = None
 _last_ping = 0
@@ -46,6 +51,8 @@ def connect(status, on_message):
         else:
             raise OSError("Wi-Fi: couldn't join %s (status %d)" % (env.WIFI_SSID, wlan.status()))
     print("Wi-Fi: connected,", wlan.ifconfig()[0])
+    ntptime.settime()   # sets the clock to UTC
+    print("Time: set,", unix_time(), "UTC")
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.verify_mode = ssl.CERT_NONE   # encrypted, but the broker's certificate isn't checked yet
@@ -59,7 +66,8 @@ def connect(status, on_message):
     _client.connect(timeout=CONNECT_TIMEOUT_S)
     _client.subscribe(TEST_TOPIC)
     _client.subscribe(STOP_TOPIC)
-    print("MQTT: connected, listening on", TEST_TOPIC, "and", STOP_TOPIC)
+    _client.subscribe(SET_TOPIC)   # retained, so a set alarm arrives right after connecting
+    print("MQTT: connected, listening on bedquake/alarm/test, stop and set")
     _last_ping = time.ticks_ms()
     publish_status(status)
 
@@ -67,6 +75,10 @@ def connect(status, on_message):
 def publish_status(status):
     _client.publish(STATUS_TOPIC, json.dumps(status), retain=True)
     print("MQTT: status", status)
+
+
+def unix_time():
+    return time.time() + UNIX_OFFSET
 
 
 def check():
