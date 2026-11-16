@@ -1,7 +1,8 @@
 """Wi-Fi + MQTT for the Pico. Knows nothing about the shaker.
 
-connect(status) joins Wi-Fi, connects to the broker over TLS, and publishes status.
-Then call check() often: it handles incoming messages and keeps the connection alive.
+connect(status, on_message) joins Wi-Fi, connects to the broker over TLS, publishes
+status, and subscribes to the command topics. Then call check() often: it passes each
+incoming message to on_message(topic, payload) and keeps the connection alive.
 """
 import json
 import machine
@@ -16,6 +17,8 @@ from umqtt.simple import MQTTClient
 import env
 
 STATUS_TOPIC = "bedquake/status"
+TEST_TOPIC = "bedquake/alarm/test"
+STOP_TOPIC = "bedquake/alarm/stop"
 KEEPALIVE_S = 60          # if we go silent this long (x1.5), the broker publishes the last-will
 PING_MS = 30_000          # ping well inside the keepalive
 WIFI_COUNTRY = "US"
@@ -27,7 +30,7 @@ _client = None
 _last_ping = 0
 
 
-def connect(status):
+def connect(status, on_message):
     global _client, _last_ping
     rp2.country(WIFI_COUNTRY)
     wlan = network.WLAN(network.STA_IF)
@@ -51,9 +54,12 @@ def connect(status):
     _client = MQTTClient(client_id, env.MQTT_HOST, port=env.MQTT_PORT, user=env.PICO_MQTT_USER,
                          password=env.PICO_MQTT_PASS, keepalive=KEEPALIVE_S, ssl=context)
     _client.set_last_will(STATUS_TOPIC, json.dumps({"online": False}), retain=True)
+    _client.set_callback(lambda topic, msg: on_message(topic.decode(), msg.decode()))
     print("MQTT: connecting to", env.MQTT_HOST)
     _client.connect(timeout=CONNECT_TIMEOUT_S)
-    print("MQTT: connected")
+    _client.subscribe(TEST_TOPIC)
+    _client.subscribe(STOP_TOPIC)
+    print("MQTT: connected, listening on", TEST_TOPIC, "and", STOP_TOPIC)
     _last_ping = time.ticks_ms()
     publish_status(status)
 
