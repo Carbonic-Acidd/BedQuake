@@ -1,35 +1,33 @@
 # BedQuake
 
 Silent bed-shaker alarm. Pico WH (MicroPython) -> TPA3116 amp -> bass shaker.
-GitHub Pages site -> public MQTT broker (broker.hivemq.com) -> Pico.
+PWA website (Vite, plain JS, hosted on Vercel) <-> HiveMQ Cloud MQTT <-> Pico.
 Team final project for Northeastern's Cornerstone of Engineering.
+Roadmap and MQTT topics contract: PLAN.md. See README.md for every file's job.
 
 ## Style
-- Least code that fully works. Flat, readable, no classes or frameworks.
+- Least code that fully works. Flat, readable, one job per file, no classes or frameworks.
 - Tunable values as named constants at the top of each file.
 - Ask before adding any file, dependency, or feature.
-- Build one step at a time; stop after each so the human can test on hardware.
+- Build one PLAN.md step at a time; stop after each so the human tests on hardware.
 - Never guess wiring. Ask.
 
-## Layout
-- pico/  code for the Pico. secrets.py is gitignored (template: secrets.example.py).
+## Commands
+- make setup / make pico-setup / make run / make stop / make logs / make dev
+- make run uses `mpremote ... run --no-follow pico/main.py + repl`: plain
+  `mpremote run` doesn't pass Ctrl-C to the Pico, which leaves the shaker running.
 
-## Commands (mpremote; no Thonny)
-- Run without saving: mpremote run --no-follow pico/main.py + repl
-  (Ctrl-C stops it on the Pico, Ctrl-] exits. Plain `mpremote run` only quits
-  mpremote on Ctrl-C and leaves the program, and PWM, running on the Pico.)
-- Save and reboot: mpremote cp pico/main.py pico/secrets.py : + reset
+## Config and secrets (the repo is public)
+- One root .env (gitignored; template .env.example) holds everything.
+- Pico: scripts/gen_pico_env.py writes pico/env.py (gitignored) from .env.
+- Website: Vite reads the root .env (envDir '..'); only VITE_ vars reach the browser.
 
 ## Hardware facts (don't change without asking)
 - Power: 24 V adapter -> amp VCC, and buck converter (5 V) -> Pico.
-- GP15: PWM to amp IN+; Pico GND to amp IN-.
+- GP15: PWM to amp IN+; Pico GND to amp IN-. No amp enable pin.
 - Shaker: Dayton BST-2, 4 ohm, 10-80 Hz. Strength peaks at 50% duty
-  (strength ~ sin(pi * duty)).
-- The amp/supply protection trips at high output.
+  (strength ~ sin(pi * duty)); shaker.py inverts this with asin.
+- The amp/supply protection trips at high output; shaker.MAX_STRENGTH caps it.
 
 ## Safety
 - Any code that drives PWM turns it off in a `finally` block.
-
-## Secrets (the repo is public)
-- Never commit secrets. The MQTT topic is secret: Pico reads it from secrets.py,
-  the site reads it from the URL hash.

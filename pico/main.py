@@ -1,27 +1,18 @@
-# BedQuake step 1: loop the buzz pattern on the shaker (no network yet).
-from machine import Pin, PWM
+# BedQuake entry point, runs on boot. Wires the shaker (and later the network) together.
 import time
+import shaker
 
-SHAKER_PIN = 15
-FREQ_HZ = 45            # low tone suited to a bass shaker
-DUTY_ON = 32768         # 50% of 65535: the strongest a square wave gets
-PATTERN = [(300, 300), (300, 300), (1500, 1000)]  # (buzz_ms, pause_ms), repeats
+PATTERN = "heartbeat"   # any name in shaker.PATTERNS
+LOOP_MS = 10        # how often the shaker is updated
 
-pwm = PWM(Pin(SHAKER_PIN))
-pwm.freq(FREQ_HZ)
-pwm.duty_u16(0)
-
-print("Buzzing. Press Ctrl-C to stop.")
+print("Patterns:", ", ".join(shaker.PATTERNS))
+print("Shaker:", PATTERN, "- Ctrl-C to stop.")
+shaker.start(PATTERN)
 try:
     while True:
-        for buzz_ms, pause_ms in PATTERN:
-            pwm.duty_u16(DUTY_ON)
-            time.sleep_ms(buzz_ms)
-            pwm.duty_u16(0)
-            time.sleep_ms(pause_ms)
+        shaker.update()
+        time.sleep_ms(LOOP_MS)
 finally:
     # PWM keeps running after a script stops, so always switch it off.
-    pwm.duty_u16(0)
-    pwm.deinit()
-    Pin(SHAKER_PIN, Pin.OUT, value=0)
+    shaker.stop()
     print("Shaker off")

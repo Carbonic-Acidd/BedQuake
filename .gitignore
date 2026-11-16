@@ -1,2 +1,6 @@
-pico/secrets.py
+.env
+pico/env.py
+.venv/
+node_modules/
+web/dist/
 __pycache__/
