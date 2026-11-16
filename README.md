@@ -28,12 +28,13 @@ make pico-setup          # once per Pico, with the Pico plugged in
 - `scripts/gen_pico_env.py`: turns `.env` into `pico/env.py`, because the Pico can't read `.env`.
 - `pico/main.py`: runs on boot and wires the shaker and network together.
 - `pico/shaker.py`: drives the shaker; vibration patterns are defined at the top.
-- `pico/net.py`: Wi-Fi and MQTT (stub for now).
+- `pico/net.py`: Wi-Fi, clock (NTP) and MQTT.
 - `pico/env.py`: generated from `.env`, never edited or committed.
 - `web/package.json`: web dependencies (Vite, mqtt).
 - `web/vite.config.js`: makes Vite read the root `.env`.
 - `web/index.html`: the page.
 - `web/src/main.js`: the page's code.
-- `web/src/mqtt.js`: talks to the broker (stub for now).
+- `web/src/mqtt.js`: talks to the broker.
 - `web/public/manifest.webmanifest`: lets the phone install the site as an app.
-- `web/public/sw.js`: service worker (placeholder for now).
+- `web/public/sw.js`: service worker; opens the last loaded page when offline.
+- `web/public/*.png`: app icons (home screen and install).

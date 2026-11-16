@@ -35,12 +35,15 @@ Check: set an alarm 2 minutes ahead in `make dev` and feel it fire on time.
 
 ## 6. PWA polish
 Real manifest, icons, and a working service worker, so the site installs on a phone.
-Check: "Add to Home Screen" on the phone opens full screen.
+Check: in Chrome on the laptop (`make dev`), the install icon appears in the address bar
+and the installed app opens in its own window. Phones only run service workers over
+HTTPS, so the phone "Add to Home Screen" check happens in Step 7.
 
 ## 7. Deploy to Vercel
 Root directory `web`, VITE_ variables set in the Vercel dashboard. Test the full system
 end to end.
-Check: from the phone on mobile data, set an alarm and feel it fire.
+Check: on the phone, "Add to Home Screen" opens BedQuake full screen with its icon;
+then, on mobile data, set an alarm and feel it fire.
 
 Security note: VITE_ values are readable by anyone who loads the site. Give the website
 its own EMQX login, and consider typing the password into the page instead of
