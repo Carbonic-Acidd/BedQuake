@@ -17,10 +17,10 @@ from umqtt.simple import MQTTClient
 
 import env
 
-STATUS_TOPIC = "bedquake/status"
-TEST_TOPIC = "bedquake/alarm/test"
-STOP_TOPIC = "bedquake/alarm/stop"
-SET_TOPIC = "bedquake/alarm/set"
+STATUS_TOPIC = "shakeawake/status"
+TEST_TOPIC = "shakeawake/alarm/test"
+STOP_TOPIC = "shakeawake/alarm/stop"
+SET_TOPIC = "shakeawake/alarm/set"
 KEEPALIVE_S = 60          # if we go silent this long (x1.5), the broker publishes the last-will
 PING_MS = 30_000          # ping well inside the keepalive
 WIFI_COUNTRY = "US"
@@ -56,7 +56,7 @@ def connect(status, on_message):
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.verify_mode = ssl.CERT_NONE   # encrypted, but the broker's certificate isn't checked yet
-    client_id = "bedquake-" + hexlify(machine.unique_id()).decode()
+    client_id = "shakeawake-" + hexlify(machine.unique_id()).decode()
     # Passing an SSLContext makes umqtt send the host name (SNI), which EMQX Serverless requires.
     _client = MQTTClient(client_id, env.MQTT_HOST, port=env.MQTT_PORT, user=env.PICO_MQTT_USER,
                          password=env.PICO_MQTT_PASS, keepalive=KEEPALIVE_S, ssl=context)
@@ -67,7 +67,7 @@ def connect(status, on_message):
     _client.subscribe(TEST_TOPIC)
     _client.subscribe(STOP_TOPIC)
     _client.subscribe(SET_TOPIC)   # retained, so a set alarm arrives right after connecting
-    print("MQTT: connected, listening on bedquake/alarm/test, stop and set")
+    print("MQTT: connected, listening on shakeawake/alarm/test, stop and set")
     _last_ping = time.ticks_ms()
     publish_status(status)
 

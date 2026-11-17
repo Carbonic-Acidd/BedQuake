@@ -1,6 +1,6 @@
 {
-  "name": "BedQuake",
-  "short_name": "BedQuake",
+  "name": "Shake Awake",
+  "short_name": "Shake Awake",
   "description": "Silent bed-shaker alarm",
   "start_url": "/",
   "scope": "/",

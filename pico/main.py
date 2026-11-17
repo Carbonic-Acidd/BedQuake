@@ -1,4 +1,4 @@
-# BedQuake entry point, runs on boot. Wires the shaker and the network together.
+# Shake Awake entry point, runs on boot. Wires the shaker and the network together.
 import json
 import machine
 import time

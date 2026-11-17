@@ -1,6 +1,6 @@
-// Service worker: lets phones install BedQuake as an app, and opens the last loaded
+// Service worker: lets phones install Shake Awake as an app, and opens the last loaded
 // page when there's no internet (the Pico controls still need a connection to work).
-const CACHE = 'bedquake-v2'
+const CACHE = 'shakeawake-v1'
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))

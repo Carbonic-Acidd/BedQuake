@@ -1,4 +1,4 @@
-# BedQuake commands. Run `make help` to list them.
+# Shake Awake commands. Run `make help` to list them.
 
 ifeq ($(OS),Windows_NT)
 PYTHON ?= python

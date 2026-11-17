@@ -1,10 +1,10 @@
 // Talks to the EMQX broker over wss. Knows nothing about the page.
 import mqtt from 'mqtt'
 
-const STATUS_TOPIC = 'bedquake/status'
-const TEST_TOPIC = 'bedquake/alarm/test'
-const STOP_TOPIC = 'bedquake/alarm/stop'
-const SET_TOPIC = 'bedquake/alarm/set'
+const STATUS_TOPIC = 'shakeawake/status'
+const TEST_TOPIC = 'shakeawake/alarm/test'
+const STOP_TOPIC = 'shakeawake/alarm/stop'
+const SET_TOPIC = 'shakeawake/alarm/set'
 
 let client
 

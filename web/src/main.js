@@ -4,7 +4,7 @@ import { connect, test, stop, setAlarm, clearAlarm } from './mqtt.js'
 
 const TEST_SECONDS = 10           // how long a test button plays
 const CONFIRM_TIMEOUT_MS = 5000   // how long to wait for the Pico to confirm an alarm change
-const PASSWORD_KEY = 'bedquake-mqtt-password'   // where this device remembers the password
+const PASSWORD_KEY = 'shakeawake-mqtt-password'   // where this device remembers the password
 
 const $ = (id) => document.getElementById(id)
 let shownPatterns = ''   // the pattern names the buttons were built from

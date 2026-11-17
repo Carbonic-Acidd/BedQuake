@@ -1,4 +1,4 @@
-# BedQuake
+# Shake Awake
 
 Silent bed-shaker alarm. Pico WH (MicroPython) -> TPA3116 amp -> bass shaker.
 PWA website (Vite, plain JS, hosted on Vercel) <-> EMQX Serverless MQTT broker (TLS only) <-> Pico.

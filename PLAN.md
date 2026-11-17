@@ -1,4 +1,4 @@
-# BedQuake plan
+# Shake Awake plan
 
 Each step is small and ends with a check you can do with a `make` command and your
 eyes or ears. Do one step at a time.
@@ -9,14 +9,14 @@ Check: `make run` and feel the pulse pattern; Ctrl-C stops it.
 
 ## 2. Pico joins Wi-Fi and the broker
 `net.py` joins Wi-Fi and connects to EMQX Serverless over TLS (port 8883). It publishes a
-retained `bedquake/status` with a last-will of `{"online": false}`.
+retained `shakeawake/status` with a last-will of `{"online": false}`.
 `gen_pico_env.py` now **requires** the Pico keys and stops if any are blank.
-Check: `make run` prints "connected". In MQTTX Web (mqttx.app/web-client), `bedquake/status`
+Check: `make run` prints "connected". In MQTTX Web (mqttx.app/web-client), `shakeawake/status`
 shows online, and unplugging the Pico shows offline within about 90 seconds.
 
 ## 3. Pico obeys commands
-The Pico handles `bedquake/alarm/test` (play a pattern by name for N seconds) and
-`bedquake/alarm/stop`.
+The Pico handles `shakeawake/alarm/test` (play a pattern by name for N seconds) and
+`shakeawake/alarm/stop`.
 Check: publish them from MQTTX Web and feel the shaker start and stop.
 
 Why this is its own step: it tests the Pico side before the website exists, so a
@@ -28,7 +28,7 @@ later bug is clearly in either the Pico or the website, not both.
 Check: `make dev`, open the page, tap a pattern, and feel it.
 
 ## 5. Alarm
-The website publishes `bedquake/alarm/set`. The Pico gets the time from NTP, starts the
+The website publishes `shakeawake/alarm/set`. The Pico gets the time from NTP, starts the
 chosen pattern at the set time, and auto-stops after a maximum run time. Stop works
 from the website.
 Check: set an alarm 2 minutes ahead in `make dev` and feel it fire on time.
@@ -42,7 +42,7 @@ HTTPS, so the phone "Add to Home Screen" check happens in Step 7.
 ## 7. Deploy to Vercel
 Root directory `web`, VITE_ variables set in the Vercel dashboard. Test the full system
 end to end.
-Check: on the phone, "Add to Home Screen" opens BedQuake full screen with its icon;
+Check: on the phone, "Add to Home Screen" opens Shake Awake full screen with its icon;
 then, on mobile data, set an alarm and feel it fire.
 
 Security: VITE_ values are readable by anyone who loads the site, so only the broker URL
@@ -54,10 +54,10 @@ Times are UTC Unix seconds. Payloads are JSON.
 
 | Topic | Direction | Retained | Example payload |
 |---|---|---|---|
-| `bedquake/status` | Pico -> web | yes (+ last-will) | `{"online": true, "playing": "pulse", "patterns": ["pulse", "breathe", "steady", "heartbeat"], "alarm": {"time": 1763290800, "pattern": "pulse"}}` (`"alarm": null` when none), last-will `{"online": false}` |
-| `bedquake/alarm/test` | web -> Pico | no | `{"pattern": "breathe", "seconds": 10}` (default 10, max 600) |
-| `bedquake/alarm/stop` | web -> Pico | no | anything, e.g. `{}` |
-| `bedquake/alarm/set` | web -> Pico | yes | `{"time": 1763290800, "pattern": "pulse"}`; an empty message clears it |
+| `shakeawake/status` | Pico -> web | yes (+ last-will) | `{"online": true, "playing": "pulse", "patterns": ["pulse", "breathe", "steady", "heartbeat"], "alarm": {"time": 1763290800, "pattern": "pulse"}}` (`"alarm": null` when none), last-will `{"online": false}` |
+| `shakeawake/alarm/test` | web -> Pico | no | `{"pattern": "breathe", "seconds": 10}` (default 10, max 600) |
+| `shakeawake/alarm/stop` | web -> Pico | no | anything, e.g. `{}` |
+| `shakeawake/alarm/set` | web -> Pico | yes | `{"time": 1763290800, "pattern": "pulse"}`; an empty message clears it |
 
 Alarms are one-shot: the Pico forgets an alarm once it fires, and skips any alarm more
 than 120 s in the past (so the stale retained `alarm/set` doesn't refire after a restart).

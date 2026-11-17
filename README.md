@@ -1,4 +1,4 @@
-# BedQuake
+# Shake Awake
 
 A silent bed-shaker alarm. A Raspberry Pi Pico WH drives a bass shaker through an
 amp, and (soon) a phone web app controls it over MQTT through an EMQX Serverless broker.
