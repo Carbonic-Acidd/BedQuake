@@ -9,9 +9,10 @@ import shaker
 LOOP_MS = 10            # how often the shaker and the network are serviced
 RETRY_S = 5             # wait before restarting after an error
 DEFAULT_TEST_S = 10     # test length when the message doesn't say
-MAX_RUN_S = 600         # safety: nothing plays longer than this
+MAX_RUN_S = 90          # alarms play this long unless stopped; tests can't be longer
 DEFAULT_ALARM_PATTERN = "pulse"
 ALARM_GRACE_S = 120     # still fire an alarm this late (e.g. the Pico restarted at alarm time)
+GIVE_UP_S = 300         # offline this long with no alarm waiting: restart (a fresh start always rejoins)
 
 # status["alarm"] is None or {"time": UTC Unix seconds, "pattern": name}
 status = {"online": True, "playing": None, "patterns": list(shaker.PATTERNS), "alarm": None}
@@ -87,12 +88,20 @@ try:
     print("Ready. Ctrl-C to stop.")
     while True:
         shaker.update()
-        net.check()
+        if net.online():
+            net.check()
+        elif stop_at is None:   # reconnecting can block for seconds, which would freeze a playing pattern
+            net.reconnect(status)
+            if status["alarm"] is None and net.offline_s() >= GIVE_UP_S:
+                print("Offline", GIVE_UP_S, "s with no alarm waiting - restarting")
+                machine.reset()
         if stop_at is not None and time.ticks_diff(time.ticks_ms(), stop_at) >= 0:
             silence()
         if status["alarm"] and net.unix_time() >= status["alarm"]["time"]:
             fire_alarm()
         time.sleep_ms(LOOP_MS)
+# Losing the network later doesn't land here (net.py handles it). This catches failing to
+# get online at boot (no clock, so no alarms) and real bugs.
 except Exception as e:   # Ctrl-C isn't an Exception, so it skips this and just stops
     shaker.stop()
     print("Error:", repr(e), "- restarting in", RETRY_S, "s")

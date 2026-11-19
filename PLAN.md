@@ -55,13 +55,20 @@ Times are UTC Unix seconds. Payloads are JSON.
 | Topic | Direction | Retained | Example payload |
 |---|---|---|---|
 | `shakeawake/status` | Pico -> web | yes (+ last-will) | `{"online": true, "playing": "pulse", "patterns": ["pulse", "breathe", "steady", "heartbeat"], "alarm": {"time": 1763290800, "pattern": "pulse"}}` (`"alarm": null` when none), last-will `{"online": false}` |
-| `shakeawake/alarm/test` | web -> Pico | no | `{"pattern": "breathe", "seconds": 10}` (default 10, max 600) |
+| `shakeawake/alarm/test` | web -> Pico | no | `{"pattern": "breathe", "seconds": 10}` (default 10, max 90) |
 | `shakeawake/alarm/stop` | web -> Pico | no | anything, e.g. `{}` |
 | `shakeawake/alarm/set` | web -> Pico | yes | `{"time": 1763290800, "pattern": "pulse"}`; an empty message clears it |
 
 Alarms are one-shot: the Pico forgets an alarm once it fires, and skips any alarm more
 than 120 s in the past (so the stale retained `alarm/set` doesn't refire after a restart).
-An alarm plays until Stop, or 600 s at most. The website sends `alarm/set` with QoS 1.
+An alarm plays until Stop, or 90 s at most. The website sends `alarm/set` with QoS 1.
+
+Offline: the Pico needs the internet at boot to set its clock. After that, if the network
+drops, it keeps its alarm and clock, fires the alarm on time, and tries to reconnect every
+30 s (not while playing), resyncing the clock when it does. Each Wi-Fi rejoin switches the
+radio off and on first (a plain rejoin can get stuck). After 5 minutes offline with no alarm
+waiting, it restarts, since a fresh start always rejoins. Stop from the website can't reach
+it while it's offline.
 
 The Pico lists its patterns in `status`, so adding one in `pico/shaker.py` adds a
 button on the website with no web change.
