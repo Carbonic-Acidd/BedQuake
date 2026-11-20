@@ -1,5 +1,6 @@
-// The page: sends test, stop and alarm commands to the Worker's /api, which passes them on
-// to the Pico. The page can't see the Pico, so it only shows whether each command was sent.
+// The page: sends test, stop, alarm and calendar sync commands to the Worker's /api, which
+// passes them on to the Pico. The page can't see the Pico, so it only shows whether each
+// command was sent.
 //
 // Password: the site itself holds none. You type the shared password once; this device
 // remembers it and sends it with every /api call, and the Worker checks it (backend/src/entry.py).
@@ -71,6 +72,21 @@ async function login(event) {
   try { localStorage.setItem(PASSWORD_KEY, password) } catch {}
   $('login').hidden = true
   $('result').textContent = 'Password OK. This device will remember it.'
+  sync()
+}
+
+// Reads the calendar and sends its alarms to the Pico (the same job as the nightly sync), then
+// shows the next one. The Worker keeps no copy of what it sent, so syncing is how the page knows.
+async function sync() {
+  $('next-alarm').textContent = 'Syncing...'
+  try {
+    const { alarms } = await api('POST', 'sync')   // [[UTC seconds, pattern], ...] in time order
+    $('next-alarm').textContent = alarms.length
+      ? 'Next alarm: ' + describe(alarms[0][0]) + ' · ' + alarms[0][1]
+      : 'No calendar alarms in the next 7 days'
+  } catch (error) {
+    $('next-alarm').textContent = 'Sync failed: ' + error.message
+  }
 }
 
 function setAlarm() {
@@ -96,8 +112,10 @@ $('alarm-pattern').value = DEFAULT_PATTERN
 $('stop').onclick = () => send('POST', 'stop', null, 'stop')
 $('alarm-set').onclick = setAlarm
 $('alarm-clear').onclick = () => send('DELETE', 'alarm', null, 'alarm cleared')
+$('sync').onclick = sync
 $('login').onsubmit = login
 if (!password) askPassword('Enter the Shake Awake password. This device will remember it.')
+else sync()
 
 // Older versions remembered the broker password on this device. It isn't used any more.
 try { localStorage.removeItem('shakeawake-mqtt-password') } catch {}

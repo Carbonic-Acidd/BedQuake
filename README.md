@@ -59,7 +59,8 @@ make backend-deploy   # deploy from the laptop without pushing (e.g. to try some
 make run              # after changing pico/ (with the Pico plugged in)
 ```
 Logs and each request's CPU time: dashboard > **Workers & Pages** > **shakeawake** >
-**Observability**. The calendar sync runs at 08:00 UTC; `POST /api/sync` runs it now.
+**Observability**. The calendar sync runs at 08:00 UTC; `POST /api/sync` runs it now (the
+page's Sync button, and opening the page).
 
 ## Daily commands
 - `make run`: copy the code to the Pico and run it. Ctrl-C stops it, then Ctrl-] exits.
