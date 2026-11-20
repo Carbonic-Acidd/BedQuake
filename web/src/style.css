@@ -71,7 +71,7 @@ button:active { transform: scale(var(--press-scale)); }
   font-weight: var(--weight-strong);
 }
 @media (hover: hover) {
-  .sync:hover, .key:hover, .custom-clear:hover, .knob-label:hover { translate: 0 var(--lift); color: var(--ink); }
+  .sync:hover, .key:hover, .custom-clear:hover { translate: 0 var(--lift); color: var(--ink); }
 }
 
 /* ---------- Locked ---------- */

@@ -29,9 +29,11 @@ STATUS_TOPIC = BASE_TOPIC + "status"
 CMD_TOPIC = BASE_TOPIC + "cmd"
 ALARM_TOPICS = {BASE_TOPIC + "alarms/calendar": "calendar", BASE_TOPIC + "alarms/manual": "manual"}
 SETTINGS_TOPIC = BASE_TOPIC + "settings"   # the alarm type every alarm plays
-KEEPALIVE_S = 120         # if we go silent this long (x1.5), the broker publishes the last-will
-PING_MS = 60_000          # ping well inside the keepalive; longer = less data
-RECONNECT_MS = 30_000     # while offline, how often to retry
+KEEPALIVE_S = 20          # if we go silent this long (x1.5), the broker marks us offline (last-will),
+                          # so the website shows a lost Pico as offline within about 30 s
+PING_MS = 8_000           # ping well inside the keepalive (pings still go out while the shaker plays)
+RECONNECT_MS = 10_000     # while offline, how often to retry
+JOIN_TIMEOUT_MS = 30_000  # if Wi-Fi hasn't joined after this long, switch the radio off and on
 POLL_MS = 1_000           # while Wi-Fi is joining, how often to check it
 RADIO_OFF_MS = 2_000      # how long the radio stays off when rejoining
 NTP_EVERY_MS = 6 * 3600 * 1000   # re-sync the clock this often (it drifts)
@@ -106,7 +108,7 @@ def _reconnect_step():
         _join()
     elif _wlan.isconnected():       # Wi-Fi is up: clock, then broker
         _go_online()
-    elif time.ticks_diff(time.ticks_ms(), _joined_at) >= RECONNECT_MS:
+    elif time.ticks_diff(time.ticks_ms(), _joined_at) >= JOIN_TIMEOUT_MS:
         # Rejoin, part 1. After the network vanishes, a plain connect() can stay stuck
         # "joining" forever; switching the radio off and on first unsticks it.
         print("Wi-Fi: not joined, switching the radio off and on")
@@ -166,6 +168,19 @@ def _sync_clock():
         print("Time: set,", unix_time(), "UTC")
     except Exception as e:
         print("Time: NTP failed,", repr(e), "- alarms wait for it" if not _clock_ok else "- keeping the old time")
+
+
+def stop():
+    """Says goodbye on purpose (the program is stopping): publishes "offline" and disconnects,
+    so the website shows offline at once instead of after the keepalive."""
+    global _client
+    if _client:
+        try:
+            _client.publish(STATUS_TOPIC, "offline", retain=True)
+            _client.disconnect()
+        except Exception:
+            pass   # already gone
+        _client = None
 
 
 def _go_offline(error):

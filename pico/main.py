@@ -93,3 +93,4 @@ finally:
     # PWM keeps running after a script stops, so always switch it off.
     shaker.stop()
     print("Shaker off")
+    net.stop()   # tell the broker we're going, so the website shows offline right away

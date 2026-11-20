@@ -73,8 +73,9 @@ published, so the Pico keeps the last good list.
 The website can't read the Pico's messages (EMQX Serverless's API can't read retained ones), so
 it only shows whether each command reached the broker. It does show whether the Pico is online:
 `GET /api/status` asks EMQX's Clients API whether client `shakeawake-<id>` (the Pico's MQTT
-client id) is connected. A Pico that lost power shows offline once its keepalive runs out (about
-3 minutes). Its alarm types must match `pico/shaker.py`.
+client id) is connected; the site asks every 5 s. A Pico that lost power or Wi-Fi shows offline
+once its keepalive runs out (about 30 s); one stopped on purpose says so at once. Commands also
+report whether the Pico was listening (`delivered`), which updates the indicator straight away. Its alarm types must match `pico/shaker.py`.
 
 Alarm types (`pico/shaker.py`): classic (short, short, long), waves (slow swell), rise (silent to
 full strength over 20 s, or 10 s in a test, then holds), knock (three quick taps). The type

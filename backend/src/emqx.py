@@ -26,11 +26,13 @@ async def _request(env, method, path, body=None):
 
 
 async def publish(env, topic, payload, retain=False, qos=0):
-    """Publishes payload (a dict, sent as JSON) to topic. Raises RuntimeError if EMQX refuses."""
+    """Publishes payload (a dict, sent as JSON) to topic. Returns True if a subscriber (the Pico)
+    got it, False if nobody is subscribed right now. Raises RuntimeError if EMQX refuses."""
     response = await _request(env, "POST", "/publish", {
         "topic": topic, "payload": json.dumps(payload, separators=(",", ":")), "qos": qos, "retain": retain})
     if response.status not in OK_STATUSES:
         raise RuntimeError(f"EMQX said {response.status}: {await response.text()}")
+    return response.status == 200
 
 
 async def connected(env, client_id):

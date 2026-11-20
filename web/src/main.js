@@ -34,6 +34,7 @@ const STATUS_MS = 2500       // how long a failure message shows
 const DONE_MS = 1200         // how long Sync shows its checkmark
 const SHAKE_MS = 600         // matches the shake animation in style.css
 const TICK_MS = 30_000       // how often the countdown refreshes
+const PICO_CHECK_MS = 5_000  // how often to ask whether the Pico is online
 
 const $ = (id) => document.getElementById(id)
 const now = () => Date.now() / 1000
@@ -67,15 +68,18 @@ function showStatus(text) {
   statusTimer = setTimeout(() => delete $('status').dataset.show, STATUS_MS)
 }
 
-// Runs an API call. On failure it shows why (or locks, if the password stopped working).
+// Runs an API call and returns its reply (null on failure, after showing why, or locking if the
+// password stopped working). A command's reply says whether the Pico was listening, which is
+// the freshest news of whether it's online.
 async function run(call) {
   try {
-    await call()
-    return true
+    const reply = (await call()) || {}
+    if (typeof reply.delivered === 'boolean') setPico(reply.delivered)
+    return reply
   } catch (error) {
     if (error.message === 'wrong password') showLock()
     else showStatus('Not sent: ' + error.message)
-    return false
+    return null
   }
 }
 
@@ -215,7 +219,12 @@ async function tryType() {
   clearTimeout(previewTimer)
   previewTimer = setTimeout(endPreview, TEST_SECONDS * 1000)
   render()
-  if (!(await run(() => api.test(preview, TEST_SECONDS)))) endPreview()
+  const reply = await run(() => api.test(preview, TEST_SECONDS))
+  if (!reply) return endPreview()
+  if (reply.delivered === false) {   // nobody heard it: don't pretend it's playing
+    endPreview()
+    showStatus('The Pico is offline')
+  }
 }
 
 function endPreview() {
@@ -440,11 +449,8 @@ $('app').style.setProperty('--try-ms', TEST_SECONDS * 1000 + 'ms')   // how long
 $('stop').onclick = stop
 $('sync').onclick = sync
 $('lock').onsubmit = (event) => { event.preventDefault(); login() }
-setInterval(() => {
-  if ($('app').hidden) return
-  render()
-  checkPico()
-}, TICK_MS)
+setInterval(() => { if (!$('app').hidden) render() }, TICK_MS)
+setInterval(() => { if (!$('app').hidden && !document.hidden) checkPico() }, PICO_CHECK_MS)
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden) checkPico() })
 
 // A remembered password unlocks by itself; otherwise wait for one to be typed.

@@ -48,11 +48,12 @@ def topic(env, name):
 
 async def send(env, name, payload, retain=False):
     # Retained alarm messages use QoS 1 so the broker confirms it stored them.
+    # "delivered" says whether the Pico was listening (if not, it's offline; retained ones wait).
     try:
-        await emqx.publish(env, topic(env, name), payload, retain=retain, qos=1 if retain else 0)
+        delivered = await emqx.publish(env, topic(env, name), payload, retain=retain, qos=1 if retain else 0)
     except RuntimeError as e:
         raise HTTPException(502, str(e))
-    return {"ok": True}
+    return {"ok": True, "delivered": delivered}
 
 
 def alarms_message(alarms):
@@ -76,7 +77,7 @@ async def health(request: Request):
 
 
 # Whether the Pico is connected to the broker right now. EMQX notices a Pico that lost power
-# or Wi-Fi only after its keepalive runs out (up to about 3 minutes, see pico/net.py).
+# or Wi-Fi only after its keepalive runs out (about 30 s, see pico/net.py).
 @app.get("/api/status")
 async def status(request: Request):
     env = request.scope["env"]
