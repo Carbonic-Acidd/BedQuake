@@ -1,7 +1,9 @@
 // Cloudflare Worker config. No secrets here: they come from .dev.vars locally
 // (made by `make backend-dev`) and from `make secrets` in production.
 {
-  "name": "shakeawake",
+  // The Worker's name, which is also the start of its address: app.shakeawake.workers.dev.
+  // It must match the name in the Cloudflare dashboard, or a deploy creates a second Worker.
+  "name": "app",
   "main": "src/entry.py",
   "compatibility_date": "2026-11-19",
   "compatibility_flags": ["python_workers"],

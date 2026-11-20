@@ -12,7 +12,7 @@ phone --HTTPS + password--> Worker (/api) --REST--> EMQX --MQTT/TLS--> Pico
 ## Prerequisites
 Python 3, Node LTS, Make, and uv 0.13.4 or newer (`winget install astral-sh.uv`). On Windows: `winget install GnuWin32.Make`, or use Git Bash.
 Accounts: EMQX Cloud (a Serverless deployment) and Cloudflare (free Workers plan; no card needed).
-The first `make backend-deploy` creates the site at `https://shakeawake.<your-subdomain>.workers.dev`.
+The first `make backend-deploy` creates the site at `https://app.<your-subdomain>.workers.dev` (ours: `https://app.shakeawake.workers.dev`). The Worker's name (`app`) is set in `backend/wrangler.jsonc`; rename it there too if you rename it in the dashboard, or the next deploy makes a second Worker.
 Run every `make` command from the repo root.
 
 ## First-time setup
@@ -60,7 +60,7 @@ make secrets          # after changing any backend value in .env (CI never sees 
 make backend-deploy   # deploy from the laptop without pushing (e.g. to try something)
 make run              # after changing pico/ (with the Pico plugged in)
 ```
-Logs and each request's CPU time: dashboard > **Workers & Pages** > **shakeawake** >
+Logs and each request's CPU time: dashboard > **Workers & Pages** > **app** >
 **Observability**. The calendar sync runs once a day at the hour set in the website's Settings
 (3 am New York time unless changed; the cron fires hourly and skips the other hours);
 `POST /api/sync` runs it now (the page's Sync button, and opening the page).
