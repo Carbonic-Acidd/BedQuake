@@ -10,7 +10,7 @@ import shaker
 LOOP_MS = 10            # how often the shaker, the network and the alarms are serviced
 ERROR_PAUSE_S = 5       # after an unexpected error, wait this long and carry on (never restart)
 DEFAULT_TEST_S = 10     # test length when the message doesn't say
-MAX_RUN_S = 90          # alarms play this long unless stopped; tests can't be longer
+MAX_TEST_S = 90         # tests play no longer than this (alarms: alarms.max_run_s(), set on the website)
 
 stop_at = None          # ticks_ms when the playing pattern stops; None when silent
 
@@ -40,7 +40,7 @@ def on_message(topic, payload):
             if data["cmd"] != "test":
                 raise ValueError("unknown command")
             name = data["pattern"]
-            seconds = max(0, min(float(data.get("seconds", DEFAULT_TEST_S)), MAX_RUN_S))
+            seconds = max(0, min(float(data.get("seconds", DEFAULT_TEST_S)), MAX_TEST_S))
             shaker.PATTERNS[name]   # raises KeyError if the name is unknown
         except Exception as e:
             print("Ignored bad command:", payload, repr(e))
@@ -48,8 +48,8 @@ def on_message(topic, payload):
         play(name, seconds, test=True)
     elif topic == net.SETTINGS_TOPIC:
         try:
-            if alarms.set_type(payload, shaker.PATTERNS):
-                print("Alarm type:", payload)
+            if alarms.set_settings(payload, shaker.PATTERNS):
+                print("Settings:", payload)
         except ValueError as e:
             print("Ignored bad settings:", payload, repr(e))
     elif topic in net.ALARM_TOPICS:
@@ -74,7 +74,7 @@ def step():
             print("Alarm!", alarm)
             # An alarm saved before a type was renamed must still wake you, so fall back.
             name = alarm[1] if alarm[1] in shaker.PATTERNS else shaker.DEFAULT
-            play(name, MAX_RUN_S)         # until Stop, or the safety limit
+            play(name, alarms.max_run_s())   # until Stop, or the time set on the website
 
 
 try:

@@ -22,7 +22,10 @@ const VIEWS = { knock: 'cycle', rise: 'pinned' }   // how the trace draws each t
 const NAMES = Object.keys(TYPES)
 const title = (name) => name[0].toUpperCase() + name.slice(1)   // "classic" -> "Classic"
 const DEFAULT_TYPE = 'classic'
-const TEST_SECONDS = 10      // how long "Try" plays
+// Settings. Saved on this device and on the Worker (for the daily calendar check and the Pico),
+// which keeps them for every device.
+const SETTINGS_KEY = 'shakeawake-settings'
+const DEFAULT_SETTINGS = { icsUrl: '', leadMin: 60, syncHour: 3, maxRunS: 90, trySeconds: 10 }
 const DEFAULT_HOUR = 7       // the custom alarm picker opens at the next 7:00
 const HEIGHTS = { preview: 1, browsing: 0.95, armed: 0.85, idle: 0.6 }   // the trace's height in each state
 const DAWN_S = 8 * 3600      // the screen starts to glow this long before an alarm
@@ -46,6 +49,7 @@ const recall = (key) => { try { return JSON.parse(localStorage.getItem(key)) } c
 let alarmType = TYPES[recall(TYPE_KEY)] ? recall(TYPE_KEY) : DEFAULT_TYPE
 let browse = NAMES.indexOf(alarmType)   // the type the knob points at
 let knobAngle = ANGLES[browse]          // where the knob rests; grows past 360 as it's turned round
+const settings = { ...DEFAULT_SETTINGS, ...recall(SETTINGS_KEY) }
 const manual = { time: 0, on: false }   // the custom alarm; `on` goes false once it has passed
 Object.assign(manual, recall(MANUAL_KEY))
 let calendarNext = null   // [UTC seconds, type] from the last sync
@@ -219,7 +223,7 @@ async function tryType() {
   if (picoOnline === false || $('try').classList.contains('sending')) return refuse($('try'))
   const name = NAMES[browse]
   $('try').classList.add('sending')
-  const reply = await run(() => api.test(name, TEST_SECONDS))
+  const reply = await run(() => api.test(name, settings.trySeconds))
   $('try').classList.remove('sending')
   if (!reply) return
   if (!reply.delivered) return refuse($('try'))   // nobody heard it (run() has turned the indicator red)
@@ -227,7 +231,7 @@ async function tryType() {
   $('app').removeAttribute('data-playing')   // restart the Try countdown bar
   void $('app').offsetWidth
   clearTimeout(previewTimer)
-  previewTimer = setTimeout(endPreview, TEST_SECONDS * 1000)
+  previewTimer = setTimeout(endPreview, settings.trySeconds * 1000)
   render()
 }
 
@@ -418,6 +422,106 @@ function unlock() {
   askPassword()   // the password lives inside api.js (and this device's storage) from here on
   sync()
   checkPico()
+  fetchSettings()
+}
+
+// ---------- Settings ----------
+const minutesText = (m) => m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)} h ${m % 60}` : `${m / 60} h`
+const secondsText = (s) => s < 60 || s % 60 ? `${s} s` : `${s / 60} min`
+const hourText = (h) => new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: 'numeric' })
+
+// Each tile steps through its choices with - and + (the calendar check wraps round the clock).
+const STEPPERS = {
+  leadMin: { choices: [15, 30, 45, 60, 75, 90, 120], text: minutesText },        // before the first event
+  syncHour: { choices: [...Array(24).keys()], text: hourText, wrap: true },      // New York time
+  maxRunS: { choices: [30, 60, 90, 120, 180, 300], text: secondsText },          // an alarm stops itself
+  trySeconds: { choices: [5, 10, 15, 20], text: secondsText },                   // Try plays
+}
+let draft = {}   // the values on screen until Save
+
+// Uses what's saved on this device, and keeps the Try bar's length in step.
+function applySettings() {
+  $('app').style.setProperty('--try-ms', settings.trySeconds * 1000 + 'ms')
+}
+
+// The Worker's copy wins (another device may have changed it), including the alarm type if it
+// has one.
+async function fetchSettings() {
+  try {
+    const saved = await api.getSettings()
+    Object.assign(settings, { icsUrl: saved.ics_url, leadMin: saved.offset_min, syncHour: saved.sync_hour,
+                              maxRunS: saved.max_run_s, trySeconds: saved.try_s })
+    store(SETTINGS_KEY, settings)
+    applySettings()
+    if (TYPES[saved.pattern] && saved.pattern !== alarmType) {
+      if (NAMES[browse] === alarmType) browseTo(NAMES.indexOf(saved.pattern))
+      alarmType = saved.pattern
+      store(TYPE_KEY, alarmType)
+    }
+    render()
+  } catch {}   // offline: keep this device's copy
+}
+
+function showDraft() {
+  for (const [key, { choices, text, wrap }] of Object.entries(STEPPERS)) {
+    const at = choices.indexOf(draft[key])
+    $('val-' + key).textContent = text(draft[key])
+    $('tile-' + key).querySelector('[data-step="-1"]').disabled = !wrap && at <= 0
+    $('tile-' + key).querySelector('[data-step="1"]').disabled = !wrap && at >= choices.length - 1
+  }
+}
+
+function step(key, by) {
+  const { choices, wrap } = STEPPERS[key]
+  let at = choices.indexOf(draft[key])
+  if (at < 0) at = choices.findIndex((c) => c >= draft[key])   // a saved value that isn't a choice
+  at = wrap ? (at + by + choices.length) % choices.length : Math.min(choices.length - 1, Math.max(0, at + by))
+  draft[key] = choices[at]
+  showDraft()
+}
+
+// Settings open in a small window over the app (Escape or the close button shuts it).
+function showSettings(open) {
+  if (!open) return $('settings').close()
+  draft = { ...settings }
+  $('set-ics').value = settings.icsUrl
+  $('settings-error').textContent = ''
+  showDraft()
+  $('settings').showModal()
+}
+
+// Save: the Worker first (it checks the link), then this device, then a fresh calendar sync.
+async function saveSettings(event) {
+  event.preventDefault()
+  const next = { ...draft, icsUrl: $('set-ics').value.trim() }
+  $('settings-save').disabled = true
+  try {
+    const reply = await api.saveSettings({ ics_url: next.icsUrl, offset_min: next.leadMin, sync_hour: next.syncHour,
+                                           max_run_s: next.maxRunS, try_s: next.trySeconds, pattern: alarmType })
+    if (typeof reply.delivered === 'boolean') setPico(reply.delivered)
+  } catch (error) {
+    if (error.message === 'wrong password') { showSettings(false); return showLock() }
+    $('settings-error').textContent = error.message === 'no connection' ? 'No connection, try again' : error.message
+    shake($('settings-save'), 'nudge')
+    return
+  } finally {
+    $('settings-save').disabled = false
+  }
+  Object.assign(settings, next)
+  store(SETTINGS_KEY, settings)
+  applySettings()
+  showSettings(false)
+  render()
+  if (settings.icsUrl) sync()
+}
+
+// Forgets the password and everything else this device saved, back to the lock screen.
+function logOut() {
+  api.logOut()
+  for (const key of [SETTINGS_KEY, TYPE_KEY, MANUAL_KEY]) {
+    try { localStorage.removeItem(key) } catch {}
+  }
+  location.reload()
 }
 
 // ---------- Is the Pico online? (connected to the broker right now) ----------
@@ -445,6 +549,7 @@ function showLock() {
   swap(() => {
     $('app').hidden = true
     $('lock').hidden = false
+    if ($('settings').open) $('settings').close()
   })
 }
 
@@ -464,9 +569,17 @@ else resetPicker()
 $('custom-input').onchange = setCustom
 $('custom-input').onclick = () => { try { $('custom-input').showPicker() } catch {} }   // desktop: open the calendar
 $('custom-clear').onclick = clearCustom
+$('open-settings').onclick = () => showSettings(true)
+$('settings-close').onclick = () => showSettings(false)
+$('settings-form').onsubmit = saveSettings
+$('settings-form').onclick = (event) => {
+  const key = event.target.closest('[data-step]')
+  if (key) step(key.closest('.tile').dataset.setting, Number(key.dataset.step))
+}
+$('logout').onclick = logOut
+applySettings()
 $('knob-cap').onclick = chooseType
 $('try').onclick = tryType
-$('app').style.setProperty('--try-ms', TEST_SECONDS * 1000 + 'ms')   // how long the Try bar takes to drain
 $('stop').onclick = stop
 $('sync').onclick = sync
 $('lock').onsubmit = (event) => { event.preventDefault(); login() }

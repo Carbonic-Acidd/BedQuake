@@ -1,5 +1,6 @@
-# Turns the calendar (ICS_URL) into alarms: for each of the next DAYS days, the first timed
-# event's start minus ALARM_OFFSET_MIN. All-day events are ignored; empty days get no alarm.
+# Turns a calendar link into alarms: for each of the next DAYS days, the first timed event's
+# start minus the lead time. All-day events are ignored; empty days get no alarm.
+# entry.py decides which link and lead time (the website's saved settings, else .env).
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -9,15 +10,13 @@ from workers import fetch
 
 ZONE = ZoneInfo("America/New_York")   # whose "days" count, and the zone for floating times
 DAYS = 7
-DEFAULT_OFFSET_MIN = 60
 PATTERN = "classic"                   # calendar alarms' type (the website's alarm type overrides it on the Pico)
 
 
-async def alarms(env, now):
+async def alarms(url, offset_min, now):
     """Returns [[UTC Unix seconds, pattern], ...] in time order, only alarms after now."""
-    url = getattr(env, "ICS_URL", None)
     if not url:
-        raise RuntimeError("ICS_URL is not set")
+        raise RuntimeError("No calendar link yet: add one in Settings")
     url = url.replace("webcal://", "https://", 1)   # calendar apps often hand out webcal:// links
     try:
         response = await fetch(url)
@@ -26,7 +25,7 @@ async def alarms(env, now):
         raise RuntimeError(f"Couldn't fetch the calendar: {e}")
     if response.status != 200:
         raise RuntimeError(f"Calendar fetch said {response.status}")
-    offset = timedelta(minutes=int(getattr(env, "ALARM_OFFSET_MIN", None) or DEFAULT_OFFSET_MIN))
+    offset = timedelta(minutes=offset_min)
     try:
         return compute(text, now, offset)
     except Exception as e:

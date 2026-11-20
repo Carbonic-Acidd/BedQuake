@@ -14,8 +14,9 @@ MAX_STRENGTH = 1.0    # 1.0 = 50% duty, the strongest. Lower it if the amp's pro
 PATTERNS = {
     "classic": {"freq": 45, "steps": [(1, 1, 300), (0, 0, 300), (1, 1, 300), (0, 0, 300), (1, 1, 1500), (0, 0, 1000)]},
     "waves":   {"freq": 60, "steps": [(0, 1, 2000), (1, 0, 2000)]},
-    "rise":    {"freq": 45, "steps": [(0, 1, 20000), (1, 1, 70000)],        # silent to full over 20 s, then holds
-                "test_steps": [(0, 1, 10000), (1, 1, 80000)]},               # a test climbs over 10 s
+    # Rise: silent to full over 20 s, then holds (to 10 min, the longest an alarm can run).
+    "rise":    {"freq": 45, "steps": [(0, 1, 20000), (1, 1, 580000)],
+                "test_steps": [(0, 1, 10000), (1, 1, 590000)]},              # a test climbs over 10 s
     "knock":   {"freq": 45, "steps": [(1, 1, 120), (0, 0, 120), (1, 1, 120), (0, 0, 120), (1, 1, 120), (0, 0, 900)]},
 }
 DEFAULT = "classic"   # played if an alarm names a type this code doesn't know

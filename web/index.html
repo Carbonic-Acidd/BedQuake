@@ -50,6 +50,9 @@
   <main id="app" class="app" hidden>
     <header class="top">
       <img class="brand-logo" src="/logo.png" alt="Shake Awake" width="900" height="133">
+      <button id="open-settings" class="faders" aria-label="Settings">
+        <svg class="icon icon-faders" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16"/><g class="knobs"><rect x="3.5" y="12.5" width="5" height="3.5" rx="1.1"/><rect x="9.5" y="7" width="5" height="3.5" rx="1.1"/><rect x="15.5" y="14" width="5" height="3.5" rx="1.1"/></g></svg>
+      </button>
     </header>
 
     <!-- One device: the screen, the knob, the custom alarm and the keys share a single body -->
@@ -119,6 +122,75 @@
     </div>
 
     <p id="status" class="status" role="status"></p>
+
+    <!-- Settings: a small window over the app. Saved on this device and on the Worker (shared by every device). -->
+    <dialog id="settings" class="settings" aria-labelledby="settings-title">
+      <form id="settings-form" class="settings-form">
+        <div class="settings-head">
+          <h2 id="settings-title" tabindex="-1" autofocus>Settings</h2>
+          <button type="button" id="settings-close" class="custom-clear settings-close" aria-label="Close settings">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>
+          </button>
+        </div>
+        <label class="link">
+          <span class="tile-name">Calendar link</span>
+          <input id="set-ics" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="webcal:// or https://">
+        </label>
+        <div class="tiles">
+          <div id="tile-leadMin" class="tile" data-setting="leadMin">
+            <p class="tile-text"><span class="tile-name">Wake me</span><span class="tile-hint">before the first event</span></p>
+            <div class="stepper">
+              <button type="button" class="tile-key" data-step="-1" aria-label="Wake me: less">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+              </button>
+              <output id="val-leadMin" class="tile-value"></output>
+              <button type="button" class="tile-key" data-step="1" aria-label="Wake me: more">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="tile-syncHour" class="tile" data-setting="syncHour">
+            <p class="tile-text"><span class="tile-name">Calendar check</span><span class="tile-hint">daily, New York time</span></p>
+            <div class="stepper">
+              <button type="button" class="tile-key" data-step="-1" aria-label="Calendar check: less">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+              </button>
+              <output id="val-syncHour" class="tile-value"></output>
+              <button type="button" class="tile-key" data-step="1" aria-label="Calendar check: more">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="tile-maxRunS" class="tile" data-setting="maxRunS">
+            <p class="tile-text"><span class="tile-name">Alarm stops after</span><span class="tile-hint">if you don't press Stop</span></p>
+            <div class="stepper">
+              <button type="button" class="tile-key" data-step="-1" aria-label="Alarm stops after: less">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+              </button>
+              <output id="val-maxRunS" class="tile-value"></output>
+              <button type="button" class="tile-key" data-step="1" aria-label="Alarm stops after: more">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="tile-trySeconds" class="tile" data-setting="trySeconds">
+            <p class="tile-text"><span class="tile-name">Try plays for</span><span class="tile-hint">each time</span></p>
+            <div class="stepper">
+              <button type="button" class="tile-key" data-step="-1" aria-label="Try plays for: less">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+              </button>
+              <output id="val-trySeconds" class="tile-value"></output>
+              <button type="button" class="tile-key" data-step="1" aria-label="Try plays for: more">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <p id="settings-error" class="settings-error" role="alert"></p>
+        <button id="settings-save" class="settings-save">Save</button>
+        <button type="button" id="logout" class="logout">Log out of this device</button>
+      </form>
+    </dialog>
   </main>
   <script type="module" src="/src/main.js"></script>
 </body>

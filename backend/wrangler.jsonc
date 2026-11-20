@@ -12,7 +12,11 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
-  // Nightly calendar sync at 08:00 UTC (3 am EST / 4 am EDT). Cron times are always UTC.
-  "triggers": { "crons": ["0 8 * * *"] },
+  // The settings saved from the website (calendar link, lead time, alarm type, auto-off), so the
+  // nightly sync can use them. The id isn't a secret. `make backend-dev` uses a local copy.
+  "kv_namespaces": [{ "binding": "SETTINGS", "id": "b24b631825a041099420ac7b47be588e" }],
+  // Every hour on the hour; the Worker syncs the calendar only in the hour chosen in Settings
+  // (3 am New York time unless changed). A cron can't be changed without a deploy, hence hourly.
+  "triggers": { "crons": ["0 * * * *"] },
   "observability": { "enabled": true }   // Workers Logs: shows each request's CPU time
 }

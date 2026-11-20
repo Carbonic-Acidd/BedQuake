@@ -62,8 +62,8 @@ The website calls the Worker's `/api`; the Worker publishes through EMQX's REST 
 | `shakeawake/<id>/status` | Pico -> broker | yes (+ last-will) | `online`, last-will `offline` | the Pico |
 | `shakeawake/<id>/cmd` | Worker -> Pico | no / 0 | `{"cmd": "test", "pattern": "waves", "seconds": 10}` (max 90) or `{"cmd": "stop"}` | `POST /api/test`, `POST /api/stop` |
 | `shakeawake/<id>/alarms/manual` | Worker -> Pico | yes / 1 | `{"v": 1, "gen": 1763290000, "alarms": [[1763290800, "classic"]]}`; `"alarms": []` clears it | `PUT /api/alarm`, `DELETE /api/alarm` |
-| `shakeawake/<id>/alarms/calendar` | Worker -> Pico | yes / 1 | same shape, up to 7 alarms | nightly cron (08:00 UTC), `POST /api/sync` |
-| `shakeawake/<id>/settings` | Worker -> Pico | yes / 1 | `{"v": 1, "pattern": "rise"}`: the alarm type every alarm plays (calendar and custom) | `PUT /api/type` |
+| `shakeawake/<id>/alarms/calendar` | Worker -> Pico | yes / 1 | same shape, up to 7 alarms | daily calendar check (hourly cron, runs in the hour set in Settings), `POST /api/sync` |
+| `shakeawake/<id>/settings` | Worker -> Pico | yes / 1 | `{"v": 1, "pattern": "rise", "max_run_s": 90}`: the alarm type every alarm plays (calendar and custom; `null` = each alarm's own) and how long an alarm plays before stopping itself (10-600 s) | `PUT /api/type`, `PUT /api/settings` |
 
 Calendar alarms: for each of the next 7 days (America/New_York), the first timed event's
 start minus `ALARM_OFFSET_MIN`. All-day and cancelled events are ignored, days without events
@@ -79,14 +79,24 @@ report whether the Pico was listening (`delivered`), which updates the indicator
 
 Alarm types (`pico/shaker.py`): classic (short, short, long), waves (slow swell), rise (silent to
 full strength over 20 s, or 10 s in a test, then holds), knock (three quick taps). The type
-chosen on the website (the settings topic, saved to `type.json`) overrides each alarm's own; an
+chosen on the website (the settings topic, saved to `settings.json`) overrides each alarm's own; an
 alarm naming an unknown type plays classic, so a renamed type can never silence an alarm.
 
 Alarms on the Pico (`pico/alarms.py`): each list is checked, then saved to its own file in
 flash (`calendar.json`, `manual.json`; written to a temp file and renamed, so a power cut
 can't corrupt it) and loaded on boot. The Pico fires the latest alarm that is due, merging
 both lists, and saves its time in `fired.json` first so a reboot never refires it. Alarms
-more than 5 minutes late are skipped. An alarm plays until Stop, or 90 s at most.
+more than 5 minutes late are skipped. An alarm plays until Stop, or for the time set in the
+website's Settings (90 s unless changed).
+
+Settings (the website's faders button opens a small window): the calendar link, how long before
+the first event to wake, the hour of the daily calendar check (New York time, 3 am unless
+changed), how long an alarm plays, how long Try plays, and Log out (this device forgets the
+password and its copy of everything; the shared copy stays). All are saved on the device and on
+the Worker (`PUT /api/settings`), which keeps them, with the alarm type, in Workers KV (the
+`SETTINGS` binding), so the calendar check uses them and every device shows the same after it
+unlocks; `ICS_URL` and `ALARM_OFFSET_MIN` in `.env` are fallbacks. A cron can't be
+changed without a deploy, so the Worker's cron runs every hour and syncs only in the chosen hour.
 
 Clock: the Pico has no clock battery, so it fires nothing until NTP has worked once since
 boot. It syncs on every (re)connect and every 6 hours.

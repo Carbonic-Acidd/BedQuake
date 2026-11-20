@@ -53,3 +53,6 @@ export const setType = (pattern) => api('PUT', 'type', { pattern })   // the typ
 export const test = (pattern, seconds) => api('POST', 'test', { pattern, seconds })
 export const stop = () => api('POST', 'stop')
 export const picoOnline = async () => (await api('GET', 'status')).online   // is it connected to the broker?
+export const getSettings = () => api('GET', 'settings')
+export const saveSettings = (settings) => api('PUT', 'settings', settings)
+export const logOut = forgetPassword   // this device forgets the password

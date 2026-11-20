@@ -6,7 +6,8 @@ serves the site) -> EMQX Serverless REST publish API -> broker (TLS only) -> Pic
 The website never talks to MQTT and holds no secrets. Every /api request needs the shared
 password (APP_PASSWORD, typed into the page once per device, sent as "Authorization: Bearer");
 the Worker checks it in entry.py. No Cloudflare Access (Zero Trust wants a card).
-Nightly cron turns ICS_URL into calendar alarms.
+A daily calendar check (hourly cron, runs in the hour chosen in the site's Settings) turns the
+calendar link (saved in Workers KV, else ICS_URL) into calendar alarms.
 Team final project for Northeastern's Cornerstone of Engineering.
 Roadmap and MQTT topics contract: PLAN.md. See README.md for every file's job.
 

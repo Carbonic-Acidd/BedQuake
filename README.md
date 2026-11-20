@@ -61,8 +61,9 @@ make backend-deploy   # deploy from the laptop without pushing (e.g. to try some
 make run              # after changing pico/ (with the Pico plugged in)
 ```
 Logs and each request's CPU time: dashboard > **Workers & Pages** > **shakeawake** >
-**Observability**. The calendar sync runs at 08:00 UTC; `POST /api/sync` runs it now (the
-page's Sync button, and opening the page).
+**Observability**. The calendar sync runs once a day at the hour set in the website's Settings
+(3 am New York time unless changed; the cron fires hourly and skips the other hours);
+`POST /api/sync` runs it now (the page's Sync button, and opening the page).
 
 ## Daily commands
 - `make run`: copy the code to the Pico and run it. Ctrl-C stops it, then Ctrl-] exits.
@@ -81,18 +82,19 @@ page's Sync button, and opening the page).
 - `PLAN.md`: the roadmap and the MQTT topics contract.
 - `scripts/gen_pico_env.py`: turns `.env` into `pico/env.py`, because the Pico can't read `.env`.
 - `scripts/gen_dev_vars.py`: copies the backend's keys from `.env` to `backend/.dev.vars` (local dev) or uploads them as Worker secrets.
-- `backend/wrangler.jsonc`: the Cloudflare Worker's config; serves `web/dist` and sends `/api/*` to Python.
+- `backend/wrangler.jsonc`: the Cloudflare Worker's config; serves `web/dist`, sends `/api/*` to Python, and binds the `SETTINGS` KV store (the website's saved settings).
 - `backend/pyproject.toml`: the Worker's Python packages: FastAPI, icalendar, recurring-ical-events (`uv.lock` and `pylock.toml` pin them).
 - `backend/src/entry.py`: the Worker: the password check and the `/api` endpoints.
 - `backend/src/emqx.py`: EMQX's REST API: publishes MQTT messages, and asks whether the Pico is connected.
-- `backend/src/calendar_job.py`: reads the calendar (`ICS_URL`) and works out the next 7 days' alarms.- `pico/main.py`: runs on boot and wires the shaker, alarms and network together.
+- `backend/src/calendar_job.py`: reads the calendar link (from Settings, else `ICS_URL`) and works out the next 7 days' alarms.
+- `pico/main.py`: runs on boot and wires the shaker, alarms and network together.
 - `pico/shaker.py`: drives the shaker; the alarm types (classic, waves, rise, knock) are defined at the top (keep `TYPES` in `web/src/main.js` in sync, names and steps).
 - `pico/net.py`: Wi-Fi, clock (NTP) and MQTT; never blocks waiting for Wi-Fi.
 - `pico/alarms.py`: the calendar and manual alarm lists and the chosen alarm type, saved in flash; decides when one is due.
 - `pico/env.py`: generated from `.env`, never edited or committed.
 - `web/package.json`: web dependencies (Vite).
 - `web/index.html`: the page: a lock screen, then one screen of controls.
-- `web/src/main.js`: the page's behavior: password + slide to unlock, the next alarm, the alarm type knob (turn to choose, press to set), Try, the custom alarm, Sync, Stop.
+- `web/src/main.js`: the page's behavior: password + slide to unlock, the next alarm, the alarm type knob (turn to choose, press to set), Try, the custom alarm, Sync, Stop, and the Settings panel.
 - `web/src/api.js`: the only code that calls the Worker's `/api`; remembers the password on this device.
 - `web/src/wave.js`: draws the live trace on the screen for the alarm type the knob points at.
 - `web/src/tokens.css`: the design tokens (colors, type, spacing, radii, depth, motion), all from the logo.
