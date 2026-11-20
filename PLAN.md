@@ -35,40 +35,54 @@ Check: set an alarm 2 minutes ahead in `make dev` and feel it fire on time.
 
 ## 6. PWA polish
 Real manifest, icons, and a working service worker, so the site installs on a phone.
-Check: in Chrome on the laptop (`make dev`), the install icon appears in the address bar
-and the installed app opens in its own window. Phones only run service workers over
+Check: in Chrome on the laptop (`make backend-dev`), the install icon appears in the address
+bar and the installed app opens in its own window. Phones only run service workers over
 HTTPS, so the phone "Add to Home Screen" check happens in Step 7.
 
-## 7. Deploy to Vercel
-Root directory `web`, VITE_ variables set in the Vercel dashboard. Test the full system
-end to end.
-Check: on the phone, "Add to Home Screen" opens Shake Awake full screen with its icon;
-then, on mobile data, set an alarm and feel it fire.
+## 7. Cloudflare Worker backend (replaced the Vercel site and the website's MQTT)
+`backend/` is one Cloudflare Worker: it serves the site, publishes the website's commands
+through EMQX's REST API, and syncs the calendar nightly. The Pico keeps its alarms in flash
+and works offline. Setup and deploy: README.md.
+Check: on the phone, enter the password, "Add to Home Screen" opens Shake Awake full screen
+with its icon; then, on mobile data, set an alarm and feel it fire.
 
-Security: VITE_ values are readable by anyone who loads the site, so only the broker URL
-and the website's username are VITE_ values. The website's password is typed into the
-page once and remembered on that device; it is never in the repo or the deployed site.
+Security: the website holds no secrets. Every `/api` request needs the shared password
+(`APP_PASSWORD`), which the Worker checks; the EMQX API key, the calendar link and the
+password live only in Worker secrets (`make secrets`).
 
-## MQTT topics (the contract between the Pico and the website)
-Times are UTC Unix seconds. Payloads are JSON.
+Steps 1-6 describe the original build; the website's MQTT and the old topics they mention
+are gone (see the contract below).
 
-| Topic | Direction | Retained | Example payload |
-|---|---|---|---|
-| `shakeawake/status` | Pico -> web | yes (+ last-will) | `{"online": true, "playing": "pulse", "patterns": ["pulse", "breathe", "steady", "heartbeat"], "alarm": {"time": 1763290800, "pattern": "pulse"}}` (`"alarm": null` when none), last-will `{"online": false}` |
-| `shakeawake/alarm/test` | web -> Pico | no | `{"pattern": "breathe", "seconds": 10}` (default 10, max 90) |
-| `shakeawake/alarm/stop` | web -> Pico | no | anything, e.g. `{}` |
-| `shakeawake/alarm/set` | web -> Pico | yes | `{"time": 1763290800, "pattern": "pulse"}`; an empty message clears it |
+## MQTT topics (the contract between the Pico and the Worker)
+The website calls the Worker's `/api`; the Worker publishes through EMQX's REST API.
+`<id>` is `DEVICE_ID` from `.env`. Times are UTC Unix seconds. Payloads are JSON except status.
 
-Alarms are one-shot: the Pico forgets an alarm once it fires, and skips any alarm more
-than 120 s in the past (so the stale retained `alarm/set` doesn't refire after a restart).
-An alarm plays until Stop, or 90 s at most. The website sends `alarm/set` with QoS 1.
+| Topic | Direction | Retained / QoS | Payload | Sent by |
+|---|---|---|---|---|
+| `shakeawake/<id>/status` | Pico -> broker | yes (+ last-will) | `online`, last-will `offline` | the Pico |
+| `shakeawake/<id>/cmd` | Worker -> Pico | no / 0 | `{"cmd": "test", "pattern": "breathe", "seconds": 10}` (max 90) or `{"cmd": "stop"}` | `POST /api/test`, `POST /api/stop` |
+| `shakeawake/<id>/alarms/manual` | Worker -> Pico | yes / 1 | `{"v": 1, "gen": 1763290000, "alarms": [[1763290800, "pulse"]]}`; `"alarms": []` clears it | `PUT /api/alarm`, `DELETE /api/alarm` |
+| `shakeawake/<id>/alarms/calendar` | Worker -> Pico | yes / 1 | same shape, up to 7 alarms | nightly cron (08:00 UTC), `POST /api/sync` |
 
-Offline: the Pico needs the internet at boot to set its clock. After that, if the network
-drops, it keeps its alarm and clock, fires the alarm on time, and tries to reconnect every
-30 s (not while playing), resyncing the clock when it does. Each Wi-Fi rejoin switches the
-radio off and on first (a plain rejoin can get stuck). After 5 minutes offline with no alarm
-waiting, it restarts, since a fresh start always rejoins. Stop from the website can't reach
-it while it's offline.
+Calendar alarms: for each of the next 7 days (America/New_York), the first timed event's
+start minus `ALARM_OFFSET_MIN`. All-day and cancelled events are ignored, days without events
+get no alarm, and only future alarms are sent. If the calendar can't be read, nothing is
+published, so the Pico keeps the last good list.
 
-The Pico lists its patterns in `status`, so adding one in `pico/shaker.py` adds a
-button on the website with no web change.
+The website can't see the Pico (EMQX Serverless's API can't read retained messages), so it
+only shows whether each command reached the broker. Its pattern list must match `pico/shaker.py`.
+
+Alarms on the Pico (`pico/alarms.py`): each list is checked, then saved to its own file in
+flash (`calendar.json`, `manual.json`; written to a temp file and renamed, so a power cut
+can't corrupt it) and loaded on boot. The Pico fires the latest alarm that is due, merging
+both lists, and saves its time in `fired.json` first so a reboot never refires it. Alarms
+more than 5 minutes late are skipped. An alarm plays until Stop, or 90 s at most.
+
+Clock: the Pico has no clock battery, so it fires nothing until NTP has worked once since
+boot. It syncs on every (re)connect and every 6 hours.
+
+Offline: the Pico boots without the internet and never restarts itself. Its loop keeps
+running; every 30 s (not while playing) it retries, and if Wi-Fi hasn't come back it switches
+the radio off and on first (a plain rejoin can get stuck). Connecting to the broker blocks for
+a few seconds, so it's skipped while the shaker plays. Stop from the website can't reach it
+while it's offline.

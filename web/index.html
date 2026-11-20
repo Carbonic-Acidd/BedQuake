@@ -19,18 +19,11 @@
     h1 img { display: block; width: 300px; max-width: 85%; height: auto; margin: 0 auto; }
     h2 { font-size: 14px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; }
     .card { display: grid; gap: 8px; padding: 16px; border-radius: 16px; background: #0c1631; }
-    #pico { font-size: 24px; font-weight: 700; }
-    #pico::before { content: '●'; margin-right: 8px; }
-    #pico.online { color: #5d5; }
-    #pico.offline { color: #e66; }
-    #alarm-now { font-size: 22px; font-weight: 600; }
     .small { color: #999; font-size: 14px; }
-    #alarm-pending { color: #e5b83b; font-size: 15px; }
+    #result { min-height: 1.4em; text-align: center; color: #e5b83b; }
     #patterns, .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     button { min-height: 64px; border: 0; border-radius: 12px; background: #1c2a4d; color: #eee;
              font: inherit; text-transform: capitalize; }
-    button.playing { background: #5aa2fe; color: #030b1e; }
-    button:disabled { opacity: 0.4; }
     #stop { min-height: 88px; background: #c33; font-size: 24px; font-weight: 700; }
     input, select { min-height: 48px; border: 1px solid #2a3a63; border-radius: 12px; background: #101d3d;
                     color: #eee; font: inherit; padding: 0 12px; text-transform: capitalize; }
@@ -40,28 +33,21 @@
   <main>
     <h1><img src="/logo.png" alt="Shake Awake" width="900" height="133"></h1>
 
+    <p id="result" role="status"></p>
+
     <form id="login" class="card" hidden>
-      <h2>Broker password</h2>
-      <p id="login-note" class="small">Enter the website's EMQX password. This device will remember it.</p>
+      <h2>Password</h2>
+      <p id="login-note" class="small"></p>
       <input id="password" type="password" autocomplete="current-password" required>
-      <button>Connect</button>
+      <button>Save</button>
     </form>
 
-    <section class="card">
-      <h2>Pico</h2>
-      <p id="pico" class="offline">Waiting for the Pico...</p>
-      <p id="playing"></p>
-      <p id="connection" class="small"></p>
-    </section>
-
     <div id="patterns"></div>
-    <button id="stop" disabled>Stop</button>
+    <button id="stop">Stop</button>
 
     <section class="card">
-      <h2>The Pico's alarm</h2>
-      <p id="alarm-now">Unknown</p>
-      <p id="alarm-note" class="small"></p>
-      <p id="alarm-pending"></p>
+      <h2>Alarm</h2>
+      <p class="small">One alarm at a time: setting a new one replaces the last. Calendar alarms are separate.</p>
       <input id="alarm-time" type="datetime-local">
       <select id="alarm-pattern"></select>
       <div class="row">

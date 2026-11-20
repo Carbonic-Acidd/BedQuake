@@ -1,17 +1,19 @@
-"""Wi-Fi + MQTT for the Pico. Knows nothing about the shaker.
+"""Wi-Fi + clock (NTP) + MQTT for the Pico. Knows nothing about the shaker or alarms.
 
-connect(status, on_message) joins Wi-Fi, sets the clock from the internet (NTP),
-connects to the broker over TLS, publishes status, and subscribes to the command topics.
-It raises if it can't: without the internet clock, alarms can't work.
+start(on_message) begins joining Wi-Fi and returns at once; it never needs the internet.
+Then call service(busy) every loop. It keeps the connection going and hands each incoming
+message to on_message(topic, payload). Nothing here raises on network trouble: the Pico
+just stays offline and service() keeps retrying, so alarms keep working.
 
-After that, network errors never raise. They just take the Pico offline (online() is
-False) and the clock keeps running, so alarms still fire. While online, call check()
-often: it passes each incoming message to on_message(topic, payload) and keeps the
-connection alive. While offline, call reconnect(status) often: every RECONNECT_MS it
-tries to get back online.
+Each time it gets online it sets the clock from NTP, connects to the broker (last-will
+"offline", retained), publishes "online" (retained) and subscribes to the command and alarm
+topics; the retained alarm lists arrive right away. clock_ok() is False until NTP has worked
+once since boot: the Pico has no clock battery, so until then its time is meaningless.
+
+Connecting to the broker blocks for a few seconds (TLS), so service(busy=True) skips it
+while the shaker plays.
 """
 import gc
-import json
 import machine
 import network
 import ntptime
@@ -24,55 +26,112 @@ from umqtt.simple import MQTTClient, MQTTException
 
 import env
 
-STATUS_TOPIC = "shakeawake/status"
-TEST_TOPIC = "shakeawake/alarm/test"
-STOP_TOPIC = "shakeawake/alarm/stop"
-SET_TOPIC = "shakeawake/alarm/set"
-KEEPALIVE_S = 60          # if we go silent this long (x1.5), the broker publishes the last-will
-PING_MS = 30_000          # ping well inside the keepalive
-RECONNECT_MS = 30_000     # while offline, how often to try to get back online
-RADIO_OFF_S = 2           # how long the Wi-Fi radio stays off when rejoining
+BASE_TOPIC = "shakeawake/" + env.DEVICE_ID + "/"
+STATUS_TOPIC = BASE_TOPIC + "status"
+CMD_TOPIC = BASE_TOPIC + "cmd"
+ALARM_TOPICS = {BASE_TOPIC + "alarms/calendar": "calendar", BASE_TOPIC + "alarms/manual": "manual"}
+KEEPALIVE_S = 120         # if we go silent this long (x1.5), the broker publishes the last-will
+PING_MS = 60_000          # ping well inside the keepalive; longer = less data
+RECONNECT_MS = 30_000     # while offline, how often to retry
+POLL_MS = 1_000           # while Wi-Fi is joining, how often to check it
+RADIO_OFF_MS = 2_000      # how long the radio stays off when rejoining
+NTP_EVERY_MS = 6 * 3600 * 1000   # re-sync the clock this often (it drifts)
 WIFI_COUNTRY = "US"
 WIFI_POWER_SAVE_OFF = 0xA11140   # Pico W value that turns Wi-Fi power saving off
-WIFI_TIMEOUT_S = 20
 CONNECT_TIMEOUT_S = 10
 NETWORK_ERRORS = (OSError, MQTTException)
 
-# The web app sends UTC Unix seconds. Older MicroPython counts time from 2000, not 1970.
+# The Worker sends UTC Unix seconds (from 1970). The rp2 port's time.time() already counts
+# from 1970; some other ports count from 2000, so check instead of assuming.
 UNIX_OFFSET = 946684800 if time.gmtime(0)[0] == 2000 else 0
 
 _wlan = None
 _client = None            # None while offline
 _on_message = None
+_clock_ok = False
+_radio_off = False        # the radio is switched off, partway through a rejoin
+_next_try = 0             # ticks_ms of the next reconnect step
+_joined_at = 0            # ticks_ms when the last Wi-Fi join started
 _last_ping = 0
-_last_try = 0
-_offline_since = 0
+_last_ntp = 0
 
 
-def connect(status, on_message):
+def start(on_message):
     global _wlan, _on_message
     _on_message = on_message
+    print("Clock epoch:", time.gmtime(0)[0], "- unix offset", UNIX_OFFSET)
     rp2.country(WIFI_COUNTRY)
     _wlan = network.WLAN(network.STA_IF)
+    _join()
+
+
+def online():
+    return _client is not None
+
+
+def clock_ok():
+    return _clock_ok
+
+
+def unix_time():
+    return time.time() + UNIX_OFFSET
+
+
+def service(busy):
+    if _client:
+        _check(busy)
+    elif not busy and time.ticks_diff(time.ticks_ms(), _next_try) >= 0:
+        _reconnect_step()
+
+
+def _check(busy):
+    global _last_ping
+    try:
+        if not _wlan.isconnected():
+            raise OSError("Wi-Fi lost")
+        _client.check_msg()   # may call on_message
+        if time.ticks_diff(time.ticks_ms(), _last_ping) >= PING_MS:
+            _client.ping()
+            _last_ping = time.ticks_ms()
+    except NETWORK_ERRORS as e:
+        _go_offline(e)
+        return
+    if not busy and time.ticks_diff(time.ticks_ms(), _last_ntp) >= NTP_EVERY_MS:
+        _sync_clock()
+
+
+def _reconnect_step():
+    global _radio_off
+    if _radio_off:                  # rejoin, part 2: radio back on, start joining
+        _radio_off = False
+        _join()
+    elif _wlan.isconnected():       # Wi-Fi is up: clock, then broker
+        _go_online()
+    elif time.ticks_diff(time.ticks_ms(), _joined_at) >= RECONNECT_MS:
+        # Rejoin, part 1. After the network vanishes, a plain connect() can stay stuck
+        # "joining" forever; switching the radio off and on first unsticks it.
+        print("Wi-Fi: not joined, switching the radio off and on")
+        _wlan.active(False)
+        _radio_off = True
+        _wait(RADIO_OFF_MS)
+    else:
+        _wait(POLL_MS)              # still joining
+
+
+def _join():
+    global _joined_at
+    print("Wi-Fi: joining", env.WIFI_SSID)
     _wlan.active(True)
     _wlan.config(pm=WIFI_POWER_SAVE_OFF)   # with power saving on, joining the laptop hotspot failed
-    if not _wlan.isconnected():
-        print("Wi-Fi: joining", env.WIFI_SSID)
-        _wlan.connect(env.WIFI_SSID, env.WIFI_PASSWORD)
-        for _ in range(WIFI_TIMEOUT_S):
-            if _wlan.isconnected():
-                break
-            time.sleep(1)
-        else:
-            raise OSError("Wi-Fi: couldn't join %s (status %d)" % (env.WIFI_SSID, _wlan.status()))
-    print("Wi-Fi: connected,", _wlan.ifconfig()[0])
-    ntptime.settime()   # sets the clock to UTC; it keeps running while offline
-    print("Time: set,", unix_time(), "UTC")
-    _connect_broker(status)
+    _wlan.connect(env.WIFI_SSID, env.WIFI_PASSWORD)   # returns at once; isconnected() says when joined
+    _joined_at = time.ticks_ms()
+    _wait(POLL_MS)
 
 
-def _connect_broker(status):
+def _go_online():
     global _client, _last_ping
+    print("Wi-Fi: connected,", _wlan.ifconfig()[0])
+    _sync_clock()
     gc.collect()   # TLS needs a big block of memory, and reconnecting can leave it fragmented
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.verify_mode = ssl.CERT_NONE   # encrypted, but the broker's certificate isn't checked yet
@@ -80,87 +139,48 @@ def _connect_broker(status):
     # Passing an SSLContext makes umqtt send the host name (SNI), which EMQX Serverless requires.
     client = MQTTClient(client_id, env.MQTT_HOST, port=env.MQTT_PORT, user=env.PICO_MQTT_USER,
                         password=env.PICO_MQTT_PASS, keepalive=KEEPALIVE_S, ssl=context)
-    client.set_last_will(STATUS_TOPIC, json.dumps({"online": False}), retain=True)
+    client.set_last_will(STATUS_TOPIC, "offline", retain=True)
     client.set_callback(lambda topic, msg: _on_message(topic.decode(), msg.decode()))
     print("MQTT: connecting to", env.MQTT_HOST)
     try:
         client.connect(timeout=CONNECT_TIMEOUT_S)
-        client.subscribe(TEST_TOPIC)
-        client.subscribe(STOP_TOPIC)
-        client.subscribe(SET_TOPIC)   # retained, so a set alarm arrives right after connecting
-    except NETWORK_ERRORS:
+        client.publish(STATUS_TOPIC, "online", retain=True)
+        client.subscribe(CMD_TOPIC)
+        for topic in ALARM_TOPICS:
+            client.subscribe(topic, qos=1)   # retained, so the saved lists arrive right away
+    except Exception as e:   # any failure here just means still offline
         _close(client)
-        raise
-    print("MQTT: connected, listening on shakeawake/alarm/test, stop and set")
+        print("MQTT: couldn't connect,", repr(e), "- retrying in", RECONNECT_MS // 1000, "s")
+        _wait(RECONNECT_MS)
+        return
+    print("MQTT: online, listening on", BASE_TOPIC + "#")
     _client = client
     _last_ping = time.ticks_ms()
-    publish_status(status)
 
 
-def online():
-    return _client is not None
-
-
-def offline_s():
-    return time.ticks_diff(time.ticks_ms(), _offline_since) // 1000
-
-
-def publish_status(status):
-    if _client is None:
-        return   # offline: reconnecting publishes the latest status
+def _sync_clock():
+    global _clock_ok, _last_ntp
+    _last_ntp = time.ticks_ms()
     try:
-        _client.publish(STATUS_TOPIC, json.dumps(status), retain=True)
-        print("MQTT: status", status)
-    except NETWORK_ERRORS as e:
-        _go_offline(e)
-
-
-def unix_time():
-    return time.time() + UNIX_OFFSET
-
-
-def check():
-    global _last_ping
-    try:
-        if not _wlan.isconnected():
-            raise OSError("Wi-Fi lost")
-        _client.check_msg()   # may call on_message, which may go offline
-        if _client and time.ticks_diff(time.ticks_ms(), _last_ping) >= PING_MS:
-            _client.ping()
-            _last_ping = time.ticks_ms()
-    except NETWORK_ERRORS as e:
-        _go_offline(e)
-
-
-def reconnect(status):
-    global _last_try
-    if time.ticks_diff(time.ticks_ms(), _last_try) < RECONNECT_MS:
-        return
-    _last_try = time.ticks_ms()
-    if not _wlan.isconnected():
-        # After the network vanishes, a plain connect() can stay stuck "joining" forever.
-        # Switching the radio off and on first unsticks it.
-        print("Wi-Fi: rejoining", env.WIFI_SSID)
-        _wlan.active(False)
-        time.sleep(RADIO_OFF_S)
-        _wlan.active(True)
-        _wlan.config(pm=WIFI_POWER_SAVE_OFF)
-        _wlan.connect(env.WIFI_SSID, env.WIFI_PASSWORD)   # doesn't wait; the next try checks it
-        return
-    try:
-        ntptime.settime()   # the clock drifts a little while offline
-        print("Time: resynced,", unix_time(), "UTC")
-        _connect_broker(status)
-    except NETWORK_ERRORS as e:
-        print("MQTT: still offline,", repr(e))
+        ntptime.settime()   # sets the clock to UTC; it keeps running while offline
+        _clock_ok = True
+        print("Time: set,", unix_time(), "UTC")
+    except Exception as e:
+        print("Time: NTP failed,", repr(e), "- alarms wait for it" if not _clock_ok else "- keeping the old time")
 
 
 def _go_offline(error):
-    global _client, _last_try, _offline_since
+    global _client, _joined_at
     print("Offline:", repr(error), "- alarms still work; retrying every", RECONNECT_MS // 1000, "s")
     _close(_client)
     _client = None
-    _last_try = _offline_since = time.ticks_ms()
+    _joined_at = time.ticks_ms()   # give Wi-Fi a chance to come back by itself before a rejoin
+    _wait(RECONNECT_MS)
+
+
+def _wait(ms):
+    global _next_try
+    _next_try = time.ticks_add(time.ticks_ms(), ms)
 
 
 def _close(client):

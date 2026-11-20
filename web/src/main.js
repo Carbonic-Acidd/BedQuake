@@ -1,125 +1,105 @@
-// The page: shows the Pico's status and sends test, stop and alarm commands.
-// Everything shown about the Pico comes from its own status messages, not from this page.
-import { connect, test, stop, setAlarm, clearAlarm } from './mqtt.js'
-
-const TEST_SECONDS = 10           // how long a test button plays
-const CONFIRM_TIMEOUT_MS = 5000   // how long to wait for the Pico to confirm an alarm change
-const PASSWORD_KEY = 'shakeawake-mqtt-password'   // where this device remembers the password
+// The page: sends test, stop and alarm commands to the Worker's /api, which passes them on
+// to the Pico. The page can't see the Pico, so it only shows whether each command was sent.
+//
+// Password: the site itself holds none. You type the shared password once; this device
+// remembers it and sends it with every /api call, and the Worker checks it (backend/src/entry.py).
+const PATTERNS = ['breathe', 'heartbeat', 'pulse', 'steady']   // must match pico/shaker.py
+const DEFAULT_PATTERN = 'pulse'
+const TEST_SECONDS = 10   // how long a test button plays
+const PASSWORD_KEY = 'shakeawake-password'   // where this device remembers the password
 
 const $ = (id) => document.getElementById(id)
-let shownPatterns = ''   // the pattern names the buttons were built from
-let heard = false        // has any status arrived yet?
-let online = false
-let picoAlarm            // the alarm the Pico last reported: undefined = unknown, null = none
-let pending              // the alarm we last sent that the Pico hasn't confirmed: undefined = none
-let pendingLate = false  // the Pico is online but hasn't confirmed within CONFIRM_TIMEOUT_MS
-let pendingTimer
 
-const sameAlarm = (a, b) => (a && b ? a.time === b.time && a.pattern === b.pattern : a === b)
-const describe = (alarm) => !alarm ? 'no alarm'
-  : new Date(alarm.time * 1000).toLocaleString([], {
-      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    }) + ' · ' + alarm.pattern
+const describe = (time) => new Date(time * 1000).toLocaleString([], {
+  weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+})
 
-function render() {
-  $('pico').textContent = online ? 'Pico online' : heard ? 'Pico offline' : 'Waiting for the Pico...'
-  $('pico').className = online ? 'online' : 'offline'
+// localStorage can be blocked (e.g. private browsing); then the password lasts until reload.
+let password = ''
+try { password = localStorage.getItem(PASSWORD_KEY) || '' } catch {}
 
-  for (const button of $('patterns').children) button.disabled = !online
-  $('stop').disabled = !online
-
-  $('alarm-now').textContent = picoAlarm === undefined ? 'Unknown' : picoAlarm ? describe(picoAlarm) : 'No alarm set'
-  $('alarm-note').textContent = !online && picoAlarm !== undefined ? 'Last known. The Pico is offline.' : ''
-
-  $('alarm-pending').textContent = pending === undefined ? ''
-    : !online ? 'Sent: ' + describe(pending) + '. Saved on the broker; the Pico gets it when it reconnects.'
-    : pendingLate ? 'The Pico hasn\'t confirmed: ' + describe(pending) + '. Try again.'
-    : 'Sending: ' + describe(pending) + '...'
+function askPassword(note) {
+  password = ''
+  try { localStorage.removeItem(PASSWORD_KEY) } catch {}
+  $('login-note').textContent = note
+  $('login').hidden = false
 }
 
-function showStatus(status) {
-  heard = true
-  online = !!status.online
-
-  const names = (status.patterns || []).slice().sort()   // the Pico's order isn't stable
-  if (names.length && names.join() !== shownPatterns) {
-    shownPatterns = names.join()
-    $('patterns').replaceChildren(...names.map((name) => {
-      const button = document.createElement('button')
-      button.textContent = name
-      button.onclick = () => test(name, TEST_SECONDS)
-      return button
-    }))
-    const chosen = $('alarm-pattern').value || 'pulse'
-    $('alarm-pattern').replaceChildren(...names.map((name) => new Option(name, name)))
-    $('alarm-pattern').value = names.includes(chosen) ? chosen : names[0]
+// Calls the Worker. Returns its reply, or throws an Error whose message suits the page.
+async function api(method, path, body) {
+  let response
+  try {
+    response = await fetch('/api/' + path, {
+      method,
+      headers: { Authorization: 'Bearer ' + password, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new Error('no connection')
   }
-  for (const button of $('patterns').children) {
-    button.classList.toggle('playing', button.textContent === status.playing)
+  const data = await response.json().catch(() => ({}))
+  if (response.status === 401) {
+    askPassword('Wrong password, try again.')
+    throw new Error('wrong password')
   }
-  $('playing').textContent = online && status.playing ? 'Playing: ' + status.playing : ''
-
-  if ('alarm' in status) picoAlarm = status.alarm   // the offline last-will doesn't say
-  if (pending !== undefined && sameAlarm(pending, picoAlarm)) pending = undefined
-  render()
+  if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'error ' + response.status)
+  return data
 }
 
-// Only the latest click matters: the broker keeps the last alarm/set, and the page waits
-// until the Pico reports exactly that alarm.
-function send(alarm) {
-  pending = sameAlarm(alarm, picoAlarm) ? undefined : alarm
-  pendingLate = false
-  clearTimeout(pendingTimer)
-  pendingTimer = setTimeout(() => { pendingLate = true; render() }, CONFIRM_TIMEOUT_MS)
-  alarm ? setAlarm(alarm.time, alarm.pattern) : clearAlarm()
-  render()
+// Sends a command and shows the outcome; `what` describes it for the message.
+async function send(method, path, body, what) {
+  $('result').textContent = 'Sending...'
+  try {
+    await api(method, path, body)
+    $('result').textContent = 'Sent: ' + what
+  } catch (error) {
+    $('result').textContent = 'Not sent: ' + error.message
+  }
 }
 
-function onSetAlarm() {
-  const time = Math.floor(new Date($('alarm-time').value).getTime() / 1000)   // local -> UTC seconds
-  if (!$('alarm-time').value || time <= Date.now() / 1000) {
-    $('alarm-pending').textContent = 'Pick a time in the future.'
+// Checks a typed password right away (against /api/health) before remembering it.
+async function login(event) {
+  event.preventDefault()
+  password = $('password').value
+  $('login-note').textContent = 'Checking...'
+  try {
+    await api('GET', 'health')
+  } catch (error) {
+    if (error.message !== 'wrong password') $('login-note').textContent = 'Couldn\'t check it: ' + error.message
     return
   }
-  send({ time, pattern: $('alarm-pattern').value })
-}
-
-// The password is typed in once and remembered on this device, so it's never in the site.
-// (localStorage can be blocked, e.g. in private browsing; then it's asked for each visit.)
-function savedPassword() {
-  try { return localStorage.getItem(PASSWORD_KEY) } catch { return null }
-}
-function rememberPassword(password) {
-  try { password ? localStorage.setItem(PASSWORD_KEY, password) : localStorage.removeItem(PASSWORD_KEY) } catch {}
-}
-
-function start(password) {
+  try { localStorage.setItem(PASSWORD_KEY, password) } catch {}
   $('login').hidden = true
-  connect(password, showStatus, (text) => {
-    $('connection').textContent = 'Broker: ' + text
-    if (text === 'wrong password') {
-      rememberPassword(null)
-      $('login-note').textContent = 'Wrong password, try again.'
-      $('login').hidden = false
-    }
-  })
+  $('result').textContent = 'Password OK. This device will remember it.'
 }
 
-$('login').onsubmit = (event) => {
-  event.preventDefault()
-  rememberPassword($('password').value)
-  start($('password').value)
+function setAlarm() {
+  const value = $('alarm-time').value
+  const time = Math.floor(new Date(value).getTime() / 1000)   // local -> UTC seconds
+  if (!value || time <= Date.now() / 1000) {
+    $('result').textContent = 'Pick a time in the future.'
+    return
+  }
+  const pattern = $('alarm-pattern').value
+  send('PUT', 'alarm', { time, pattern }, 'alarm ' + describe(time) + ' · ' + pattern)
 }
+
+$('patterns').replaceChildren(...PATTERNS.map((name) => {
+  const button = document.createElement('button')
+  button.textContent = name
+  button.onclick = () => send('POST', 'test', { pattern: name, seconds: TEST_SECONDS }, name + ' for ' + TEST_SECONDS + ' s')
+  return button
+}))
+$('alarm-pattern').replaceChildren(...PATTERNS.map((name) => new Option(name, name)))
+$('alarm-pattern').value = DEFAULT_PATTERN
+
+$('stop').onclick = () => send('POST', 'stop', null, 'stop')
+$('alarm-set').onclick = setAlarm
+$('alarm-clear').onclick = () => send('DELETE', 'alarm', null, 'alarm cleared')
+$('login').onsubmit = login
+if (!password) askPassword('Enter the Shake Awake password. This device will remember it.')
+
+// Older versions remembered the broker password on this device. It isn't used any more.
+try { localStorage.removeItem('shakeawake-mqtt-password') } catch {}
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
-
-if (!import.meta.env.VITE_MQTT_URL) {
-  $('connection').textContent = 'VITE_MQTT_URL is missing from .env'
-} else {
-  $('stop').onclick = stop
-  $('alarm-set').onclick = onSetAlarm
-  $('alarm-clear').onclick = () => send(null)
-  if (savedPassword()) start(savedPassword())
-  else $('login').hidden = false
-}
-render()

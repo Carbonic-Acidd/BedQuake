@@ -8,9 +8,9 @@ PYTHON ?= python3
 PY := .venv/bin/python
 endif
 
-PICO_FILES := pico/main.py pico/net.py pico/shaker.py pico/env.py
+PICO_FILES := pico/main.py pico/net.py pico/alarms.py pico/shaker.py pico/env.py
 
-.PHONY: help setup pico-setup dev run stop logs
+.PHONY: help setup pico-setup run stop logs backend-dev backend-deploy secrets
 
 help: ## List the commands
 	@$(PYTHON) -c "import re; [print(f'make {t:12}{d}') for t, d in re.findall(r'^([a-z-]+):.*?## (.*)', open('Makefile').read(), re.M)]"
@@ -23,9 +23,6 @@ setup: ## Create .venv, install the Python tools and the web packages
 pico-setup: ## Install umqtt.simple on the Pico (once per Pico)
 	$(PY) -m mpremote mip install umqtt.simple
 
-dev: ## Run the website locally (Vite dev server)
-	npm --prefix web run dev
-
 # `run --no-follow ... + repl` instead of plain `run`: only the REPL passes Ctrl-C
 # on to the Pico, so the code's finally block runs and the shaker stops.
 run: ## Copy the code to the Pico and run it (Ctrl-C stops it, then Ctrl-] exits)
@@ -37,3 +34,15 @@ stop: ## Stop whatever is running on the Pico (shaker off)
 
 logs: ## Open the Pico's REPL to see its output (Ctrl-] exits)
 	$(PY) -m mpremote repl
+
+backend-dev: ## Build the website and run the Worker locally at http://localhost:8787
+	$(PY) scripts/gen_dev_vars.py
+	npm --prefix web run build
+	cd backend && uv run pywrangler dev --test-scheduled
+
+backend-deploy: ## Build the website and deploy the Worker to Cloudflare
+	npm --prefix web run build
+	cd backend && uv run pywrangler deploy
+
+secrets: ## Upload the backend's values from .env to Cloudflare as Worker secrets
+	$(PY) scripts/gen_dev_vars.py --upload

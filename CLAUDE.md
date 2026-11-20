@@ -1,7 +1,12 @@
 # Shake Awake
 
 Silent bed-shaker alarm. Pico WH (MicroPython) -> TPA3116 amp -> bass shaker.
-PWA website (Vite, plain JS, hosted on Vercel) <-> EMQX Serverless MQTT broker (TLS only) <-> Pico.
+PWA website (Vite, plain JS) -> /api on a Cloudflare Worker (backend/, Python + FastAPI, also
+serves the site) -> EMQX Serverless REST publish API -> broker (TLS only) -> Pico over MQTT.
+The website never talks to MQTT and holds no secrets. Every /api request needs the shared
+password (APP_PASSWORD, typed into the page once per device, sent as "Authorization: Bearer");
+the Worker checks it in entry.py. No Cloudflare Access (Zero Trust wants a card).
+Nightly cron turns ICS_URL into calendar alarms.
 Team final project for Northeastern's Cornerstone of Engineering.
 Roadmap and MQTT topics contract: PLAN.md. See README.md for every file's job.
 
@@ -13,15 +18,16 @@ Roadmap and MQTT topics contract: PLAN.md. See README.md for every file's job.
 - Never guess wiring. Ask.
 
 ## Commands
-- make setup / make pico-setup / make run / make stop / make logs / make dev
+- make setup / make pico-setup / make run / make stop / make logs
+- make backend-dev / make backend-deploy / make secrets (run from the repo root)
 - make run uses `mpremote ... run --no-follow pico/main.py + repl`: plain
   `mpremote run` doesn't pass Ctrl-C to the Pico, which leaves the shaker running.
 
 ## Config and secrets (the repo is public)
 - One root .env (gitignored; template .env.example) holds everything.
 - Pico: scripts/gen_pico_env.py writes pico/env.py (gitignored) from .env.
-- Website: Vite reads the root .env (envDir '..'); only VITE_ vars reach the browser.
-  The website's broker password is typed into the page (localStorage), never a VITE_ var.
+- Worker: scripts/gen_dev_vars.py copies only the backend keys to backend/.dev.vars
+  (gitignored, local dev) or uploads them as Worker secrets (`make secrets`).- Website: no config or secrets at all.
 
 ## Hardware facts (don't change without asking)
 - Power: 24 V adapter -> amp VCC, and buck converter (5 V) -> Pico.

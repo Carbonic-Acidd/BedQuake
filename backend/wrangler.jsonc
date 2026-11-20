@@ -1,0 +1,18 @@
+// Cloudflare Worker config. No secrets here: they come from .dev.vars locally
+// (made by `make backend-dev`) and from `make secrets` in production.
+{
+  "name": "shakeawake",
+  "main": "src/entry.py",
+  "compatibility_date": "2026-11-19",
+  "compatibility_flags": ["python_workers"],
+  "assets": {
+    // The built website. Static files are served directly, without running Python;
+    // only /api/* runs the Worker.
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  // Nightly calendar sync at 08:00 UTC (3 am EST / 4 am EDT). Cron times are always UTC.
+  "triggers": { "crons": ["0 8 * * *"] },
+  "observability": { "enabled": true }   // Workers Logs: shows each request's CPU time
+}

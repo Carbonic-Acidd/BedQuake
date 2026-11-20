@@ -1,21 +1,17 @@
-# Shake Awake entry point, runs on boot. Wires the shaker and the network together.
+# Shake Awake entry point, runs on boot. Wires the shaker, the alarms and the network together.
+# Works offline: saved alarms load from flash, and fire on time once the clock has been set.
 import json
-import machine
 import time
 
+import alarms
 import net
 import shaker
 
-LOOP_MS = 10            # how often the shaker and the network are serviced
-RETRY_S = 5             # wait before restarting after an error
+LOOP_MS = 10            # how often the shaker, the network and the alarms are serviced
+ERROR_PAUSE_S = 5       # after an unexpected error, wait this long and carry on (never restart)
 DEFAULT_TEST_S = 10     # test length when the message doesn't say
 MAX_RUN_S = 90          # alarms play this long unless stopped; tests can't be longer
-DEFAULT_ALARM_PATTERN = "pulse"
-ALARM_GRACE_S = 120     # still fire an alarm this late (e.g. the Pico restarted at alarm time)
-GIVE_UP_S = 300         # offline this long with no alarm waiting: restart (a fresh start always rejoins)
 
-# status["alarm"] is None or {"time": UTC Unix seconds, "pattern": name}
-status = {"online": True, "playing": None, "patterns": list(shaker.PATTERNS), "alarm": None}
 stop_at = None          # ticks_ms when the playing pattern stops; None when silent
 
 
@@ -23,90 +19,68 @@ def play(name, seconds):
     global stop_at
     shaker.start(name)
     stop_at = time.ticks_add(time.ticks_ms(), int(seconds * 1000))
-    status["playing"] = name
     print("Playing", name, "for", seconds, "s")
-    net.publish_status(status)
 
 
 def silence():
     global stop_at
     shaker.stop()
-    stop_at = None
-    if status["playing"]:
-        status["playing"] = None
+    if stop_at is not None:
         print("Stopped")
-        net.publish_status(status)
-
-
-def set_alarm(alarm):
-    if alarm == status["alarm"]:
-        return
-    status["alarm"] = alarm
-    print("Alarm:", alarm)
-    net.publish_status(status)
-
-
-def fire_alarm():
-    # One-shot: forget it. The broker still holds the old alarm/set message, but after a
-    # restart its time is in the past, so it's skipped (unless within the grace period).
-    alarm = status["alarm"]
-    set_alarm(None)
-    if net.unix_time() - alarm["time"] < ALARM_GRACE_S:
-        play(alarm["pattern"], MAX_RUN_S)   # until Stop, or the safety limit
-    else:
-        print("Alarm time already passed, skipping it")
+    stop_at = None
 
 
 def on_message(topic, payload):
-    if topic == net.STOP_TOPIC:
-        silence()   # stop never depends on the payload
-    elif topic == net.TEST_TOPIC:
+    if topic == net.CMD_TOPIC:
         try:
             data = json.loads(payload)
+            if data["cmd"] == "stop":
+                silence()
+                return
+            if data["cmd"] != "test":
+                raise ValueError("unknown command")
             name = data["pattern"]
             seconds = max(0, min(float(data.get("seconds", DEFAULT_TEST_S)), MAX_RUN_S))
             shaker.PATTERNS[name]   # raises KeyError if the name is unknown
         except Exception as e:
-            print("Ignored bad test message:", payload, repr(e))
+            print("Ignored bad command:", payload, repr(e))
             return
         play(name, seconds)
-    elif topic == net.SET_TOPIC:
+    elif topic in net.ALARM_TOPICS:
+        name = net.ALARM_TOPICS[topic]
         try:
-            data = json.loads(payload) if payload else {}   # empty = cleared
-            alarm = None
-            if data.get("time") is not None:
-                alarm = {"time": int(data["time"]), "pattern": data.get("pattern", DEFAULT_ALARM_PATTERN)}
-                shaker.PATTERNS[alarm["pattern"]]   # raises KeyError if the name is unknown
-        except Exception as e:
-            print("Ignored bad alarm message:", payload, repr(e))
-            return
-        set_alarm(alarm)
+            if alarms.update(name, payload, shaker.PATTERNS):
+                print("Alarms: new", name, "list", payload)
+        except ValueError as e:
+            print("Ignored bad", name, "alarms:", payload, repr(e))
+
+
+def step():
+    shaker.update()
+    net.service(busy=stop_at is not None)   # busy: skip anything that could freeze the pattern
+    if stop_at is not None and time.ticks_diff(time.ticks_ms(), stop_at) >= 0:
+        silence()
+    # No clock battery: until NTP has worked once since boot, the time is meaningless.
+    if net.clock_ok():
+        alarm = alarms.due(net.unix_time())
+        if alarm:
+            alarms.mark_fired(alarm[0])   # saved first, so a reboot mid-alarm doesn't refire it
+            print("Alarm!", alarm)
+            play(alarm[1], MAX_RUN_S)     # until Stop, or the safety limit
 
 
 try:
-    net.connect(status, on_message)
+    alarms.load()
+    net.start(on_message)
     print("Ready. Ctrl-C to stop.")
     while True:
-        shaker.update()
-        if net.online():
-            net.check()
-        elif stop_at is None:   # reconnecting can block for seconds, which would freeze a playing pattern
-            net.reconnect(status)
-            if status["alarm"] is None and net.offline_s() >= GIVE_UP_S:
-                print("Offline", GIVE_UP_S, "s with no alarm waiting - restarting")
-                machine.reset()
-        if stop_at is not None and time.ticks_diff(time.ticks_ms(), stop_at) >= 0:
+        try:
+            step()
+        except Exception as e:   # a bug, not the network (net.py handles that). Ctrl-C isn't an Exception.
             silence()
-        if status["alarm"] and net.unix_time() >= status["alarm"]["time"]:
-            fire_alarm()
+            print("Error:", repr(e), "- carrying on in", ERROR_PAUSE_S, "s")
+            time.sleep(ERROR_PAUSE_S)
         time.sleep_ms(LOOP_MS)
-# Losing the network later doesn't land here (net.py handles it). This catches failing to
-# get online at boot (no clock, so no alarms) and real bugs.
-except Exception as e:   # Ctrl-C isn't an Exception, so it skips this and just stops
-    shaker.stop()
-    print("Error:", repr(e), "- restarting in", RETRY_S, "s")
-    time.sleep(RETRY_S)
-    machine.reset()
 finally:
     # PWM keeps running after a script stops, so always switch it off.
     shaker.stop()

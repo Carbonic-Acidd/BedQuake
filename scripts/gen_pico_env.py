@@ -1,6 +1,6 @@
 """Reads the root .env and writes pico/env.py, since MicroPython can't read .env files.
 
-Run by `make run`. Only the Pico keys are copied; VITE_ keys never reach the Pico.
+Run by `make run`. Only the Pico keys are copied; the backend's keys never reach the Pico.
 """
 import sys
 from pathlib import Path
@@ -10,7 +10,8 @@ from dotenv import dotenv_values
 ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = ROOT / ".env"
 OUT_FILE = ROOT / "pico" / "env.py"
-PICO_KEYS = ["WIFI_SSID", "WIFI_PASSWORD", "PICO_MQTT_USER", "PICO_MQTT_PASS", "MQTT_HOST", "MQTT_PORT"]
+PICO_KEYS = ["WIFI_SSID", "WIFI_PASSWORD", "PICO_MQTT_USER", "PICO_MQTT_PASS", "MQTT_HOST", "MQTT_PORT",
+             "DEVICE_ID"]
 INT_KEYS = ["MQTT_PORT"]
 
 if not ENV_FILE.exists():

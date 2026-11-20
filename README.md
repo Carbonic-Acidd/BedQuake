@@ -1,23 +1,64 @@
 # Shake Awake
 
 A silent bed-shaker alarm. A Raspberry Pi Pico WH drives a bass shaker through an
-amp, and (soon) a phone web app controls it over MQTT through an EMQX Serverless broker.
+amp. A phone web app, served by a Cloudflare Worker, sends commands to the Worker's `/api`,
+which publishes them to an EMQX Serverless broker; the Pico gets them over MQTT. Each night
+the Worker also turns the next 7 days of a calendar into alarms.
+
+```
+phone --HTTPS + password--> Worker (/api) --REST--> EMQX --MQTT/TLS--> Pico
+```
 
 ## Prerequisites
-Python 3, Node LTS, and Make. On Windows: `winget install GnuWin32.Make`, or use Git Bash.
+Python 3, Node LTS, Make, and uv 0.13.4 or newer (`winget install astral-sh.uv`). On Windows: `winget install GnuWin32.Make`, or use Git Bash.
+Accounts: EMQX Cloud (a Serverless deployment) and Cloudflare (free Workers plan; no card needed).
+The first `make backend-deploy` creates the site at `https://shakeawake.<your-subdomain>.workers.dev`.
+Run every `make` command from the repo root.
 
 ## First-time setup
 ```
-cp .env.example .env     # then fill it in (blanks are fine for Step 1)
+cp .env.example .env     # then fill it in; each key has a comment saying where it comes from
 make setup               # Python tools + web packages
 make pico-setup          # once per Pico, with the Pico plugged in
+cd backend && uv run pywrangler login && cd ..   # once: lets this laptop deploy to Cloudflare
 ```
+
+### EMQX
+1. In the EMQX Cloud console, open the deployment's **Overview**.
+2. Copy the **REST API** address into `EMQX_API_URL` (ends in `/api/v5`).
+3. Under **API Key**, select **+ New API Key**; put the App ID in `EMQX_API_KEY` and the
+   App Secret in `EMQX_API_SECRET` (the secret is only shown once).
+4. Under **Access Control > Authentication**, add a username and password for the Pico
+   (`PICO_MQTT_USER`, `PICO_MQTT_PASS`); `MQTT_HOST` is the deployment's address.
+
+### The website's password
+The page is public, but it holds no secrets and can do nothing on its own. Every `/api`
+call must carry the shared password, which the Worker compares with its `APP_PASSWORD`
+secret; anything else gets a 401 and nothing is sent to the Pico.
+1. Put a long passphrase in `APP_PASSWORD` (four or five random words; plain letters,
+   numbers and spaces).
+2. `make secrets`, then `make backend-deploy`.
+3. Open the site on each phone and type the password once; that device remembers it.
+
+To change it: edit `.env`, run `make secrets`, and type the new one on each device (the
+page asks again by itself). With no `APP_PASSWORD` set, nobody can use `/api`.
+
+### Deploy
+```
+make secrets          # after changing any backend value in .env
+make backend-deploy   # after changing backend/ or web/
+make run              # after changing pico/ (with the Pico plugged in)
+```
+Logs and each request's CPU time: dashboard > **Workers & Pages** > **shakeawake** >
+**Observability**. The calendar sync runs at 08:00 UTC; `POST /api/sync` runs it now.
 
 ## Daily commands
 - `make run`: copy the code to the Pico and run it. Ctrl-C stops it, then Ctrl-] exits.
 - `make stop`: stop whatever is running on the Pico.
 - `make logs`: open the Pico's REPL.
-- `make dev`: run the website at http://localhost:5173.
+- `make backend-dev`: build the website and run the Cloudflare Worker at http://localhost:8787.
+- `make backend-deploy`: build the website and deploy the Worker.
+- `make secrets`: upload the backend's values from `.env` to Cloudflare.
 - `make help`: list all commands.
 
 ## Files
@@ -26,15 +67,19 @@ make pico-setup          # once per Pico, with the Pico plugged in
 - `requirements.txt`: laptop Python tools (mpremote, python-dotenv).
 - `PLAN.md`: the roadmap and the MQTT topics contract.
 - `scripts/gen_pico_env.py`: turns `.env` into `pico/env.py`, because the Pico can't read `.env`.
-- `pico/main.py`: runs on boot and wires the shaker and network together.
-- `pico/shaker.py`: drives the shaker; vibration patterns are defined at the top.
-- `pico/net.py`: Wi-Fi, clock (NTP) and MQTT.
+- `scripts/gen_dev_vars.py`: copies the backend's keys from `.env` to `backend/.dev.vars` (local dev) or uploads them as Worker secrets.
+- `backend/wrangler.jsonc`: the Cloudflare Worker's config; serves `web/dist` and sends `/api/*` to Python.
+- `backend/pyproject.toml`: the Worker's Python packages: FastAPI, icalendar, recurring-ical-events (`uv.lock` and `pylock.toml` pin them).
+- `backend/src/entry.py`: the Worker: the password check and the `/api` endpoints.
+- `backend/src/emqx.py`: publishes MQTT messages through EMQX's REST API.
+- `backend/src/calendar_job.py`: reads the calendar (`ICS_URL`) and works out the next 7 days' alarms.- `pico/main.py`: runs on boot and wires the shaker, alarms and network together.
+- `pico/shaker.py`: drives the shaker; vibration patterns are defined at the top (keep `web/src/main.js`'s list in sync).
+- `pico/net.py`: Wi-Fi, clock (NTP) and MQTT; never blocks waiting for Wi-Fi.
+- `pico/alarms.py`: the calendar and manual alarm lists, saved in flash; decides when one is due.
 - `pico/env.py`: generated from `.env`, never edited or committed.
-- `web/package.json`: web dependencies (Vite, mqtt).
-- `web/vite.config.js`: makes Vite read the root `.env`.
+- `web/package.json`: web dependencies (Vite).
 - `web/index.html`: the page.
-- `web/src/main.js`: the page's code.
-- `web/src/mqtt.js`: talks to the broker.
+- `web/src/main.js`: the page's code; asks for the password once and calls the Worker's `/api`.
 - `web/public/manifest.webmanifest`: lets the phone install the site as an app.
-- `web/public/sw.js`: service worker; opens the last loaded page when offline.
+- `web/public/sw.js`: service worker; opens the last loaded page when offline (never caches `/api`).
 - `web/public/*.png`: the logo (page header) and app icons (home screen and install).
