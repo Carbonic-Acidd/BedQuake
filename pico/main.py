@@ -46,6 +46,12 @@ def on_message(topic, payload):
             print("Ignored bad command:", payload, repr(e))
             return
         play(name, seconds)
+    elif topic == net.SETTINGS_TOPIC:
+        try:
+            if alarms.set_type(payload, shaker.PATTERNS):
+                print("Alarm type:", payload)
+        except ValueError as e:
+            print("Ignored bad settings:", payload, repr(e))
     elif topic in net.ALARM_TOPICS:
         name = net.ALARM_TOPICS[topic]
         try:
@@ -66,7 +72,9 @@ def step():
         if alarm:
             alarms.mark_fired(alarm[0])   # saved first, so a reboot mid-alarm doesn't refire it
             print("Alarm!", alarm)
-            play(alarm[1], MAX_RUN_S)     # until Stop, or the safety limit
+            # An alarm saved before a type was renamed must still wake you, so fall back.
+            name = alarm[1] if alarm[1] in shaker.PATTERNS else shaker.DEFAULT
+            play(name, MAX_RUN_S)         # until Stop, or the safety limit
 
 
 try:

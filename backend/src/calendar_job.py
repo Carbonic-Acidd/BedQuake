@@ -10,7 +10,7 @@ from workers import fetch
 ZONE = ZoneInfo("America/New_York")   # whose "days" count, and the zone for floating times
 DAYS = 7
 DEFAULT_OFFSET_MIN = 60
-PATTERN = "pulse"                     # what calendar alarms play
+PATTERN = "classic"                   # calendar alarms' type (the website's alarm type overrides it on the Pico)
 
 
 async def alarms(env, now):

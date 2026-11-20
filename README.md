@@ -38,10 +38,11 @@ secret; anything else gets a 401 and nothing is sent to the Pico.
 1. Put a long passphrase in `APP_PASSWORD` (four or five random words; plain letters,
    numbers and spaces).
 2. `make secrets`, then `make backend-deploy`.
-3. Open the site on each phone and type the password once; that device remembers it.
+3. Open the site, type the password and slide to unlock. It's asked for on every visit and
+   never saved on the device, so a phone left unlocked doesn't stay logged in.
 
-To change it: edit `.env`, run `make secrets`, and type the new one on each device (the
-page asks again by itself). With no `APP_PASSWORD` set, nobody can use `/api`.
+To change it: edit `.env` and run `make secrets`; the next unlock needs the new one.
+With no `APP_PASSWORD` set, nobody can use `/api`.
 
 ### Deploy
 Pushing to `main` deploys the Worker automatically when `backend/` or `web/` changed
@@ -84,13 +85,17 @@ page's Sync button, and opening the page).
 - `backend/src/entry.py`: the Worker: the password check and the `/api` endpoints.
 - `backend/src/emqx.py`: publishes MQTT messages through EMQX's REST API.
 - `backend/src/calendar_job.py`: reads the calendar (`ICS_URL`) and works out the next 7 days' alarms.- `pico/main.py`: runs on boot and wires the shaker, alarms and network together.
-- `pico/shaker.py`: drives the shaker; vibration patterns are defined at the top (keep `web/src/main.js`'s list in sync).
+- `pico/shaker.py`: drives the shaker; the alarm types (classic, waves, rise, knock) are defined at the top (keep `TYPES` in `web/src/main.js` in sync, names and steps).
 - `pico/net.py`: Wi-Fi, clock (NTP) and MQTT; never blocks waiting for Wi-Fi.
-- `pico/alarms.py`: the calendar and manual alarm lists, saved in flash; decides when one is due.
+- `pico/alarms.py`: the calendar and manual alarm lists and the chosen alarm type, saved in flash; decides when one is due.
 - `pico/env.py`: generated from `.env`, never edited or committed.
 - `web/package.json`: web dependencies (Vite).
-- `web/index.html`: the page.
-- `web/src/main.js`: the page's code; asks for the password once and calls the Worker's `/api`.
+- `web/index.html`: the page: a lock screen, then one screen of controls.
+- `web/src/main.js`: the page's behavior: password + slide to unlock, the next alarm, the alarm type knob (turn to choose, press to set), Try, the custom alarm, Sync, Stop.
+- `web/src/api.js`: the only code that calls the Worker's `/api`; holds the password in memory only (typed on every visit).
+- `web/src/wave.js`: draws the live trace on the screen for the alarm type the knob points at.
+- `web/src/tokens.css`: the design tokens (colors, type, spacing, radii, depth, motion), all from the logo.
+- `web/src/style.css`: layout and components, built only from the tokens.
 - `web/public/manifest.webmanifest`: lets the phone install the site as an app.
 - `web/public/sw.js`: service worker; opens the last loaded page when offline (never caches `/api`).
 - `web/public/*.png`: the logo (page header) and app icons (home screen and install).

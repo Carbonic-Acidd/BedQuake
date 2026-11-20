@@ -33,6 +33,10 @@ class Alarm(BaseModel):
     pattern: str = Field(min_length=1, max_length=20)
 
 
+class AlarmType(BaseModel):
+    pattern: str = Field(min_length=1, max_length=20)
+
+
 def topic(env, name):
     return f"shakeawake/{getattr(env, 'DEVICE_ID', None) or DEFAULT_DEVICE_ID}/{name}"
 
@@ -90,6 +94,13 @@ async def set_alarm(body: Alarm, request: Request):
 @app.delete("/api/alarm")
 async def clear_alarm(request: Request):
     return await send(request.scope["env"], "alarms/manual", alarms_message([]), retain=True)
+
+
+# The alarm type every alarm plays, calendar and custom (the Pico checks the name). Retained,
+# so the Pico gets it whenever it next connects and keeps it in flash.
+@app.put("/api/type")
+async def set_type(body: AlarmType, request: Request):
+    return await send(request.scope["env"], "settings", {"v": PAYLOAD_VERSION, "pattern": body.pattern}, retain=True)
 
 
 @app.post("/api/sync")

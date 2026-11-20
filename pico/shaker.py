@@ -1,5 +1,5 @@
 # Drives the bass shaker through the amp. Knows nothing about Wi-Fi or MQTT.
-# Use: start("pulse"), then call update() every ~10 ms. stop() silences it.
+# Use: start("classic"), then call update() every ~10 ms. stop() silences it.
 from machine import Pin, PWM
 import math
 import time
@@ -7,14 +7,16 @@ import time
 PIN = 15              # GP15 -> amp IN+ (Pico GND -> amp IN-)
 MAX_STRENGTH = 1.0    # 1.0 = 50% duty, the strongest. Lower it if the amp's protection trips.
 
-# name -> PWM frequency (Hz) and steps (start_strength, end_strength, ms), looped.
+# Alarm types: name -> PWM frequency (Hz) and steps (start_strength, end_strength, ms), looped.
 # Strength is 0..1. A step whose start and end differ eases smoothly between them.
+# Keep web/src/main.js's TYPES in sync (names and steps).
 PATTERNS = {
-    "pulse":     {"freq": 45, "steps": [(1, 1, 300), (0, 0, 300), (1, 1, 300), (0, 0, 300), (1, 1, 1500), (0, 0, 1000)]},
-    "breathe":   {"freq": 60, "steps": [(0, 1, 2000), (1, 0, 2000)]},
-    "steady":    {"freq": 45, "steps": [(1, 1, 1000)]},
-    "heartbeat": {"freq": 45, "steps": [(1, 1, 150), (0, 0, 100), (1, 1, 150), (0, 0, 800)]},
+    "classic": {"freq": 45, "steps": [(1, 1, 300), (0, 0, 300), (1, 1, 300), (0, 0, 300), (1, 1, 1500), (0, 0, 1000)]},
+    "waves":   {"freq": 60, "steps": [(0, 1, 2000), (1, 0, 2000)]},
+    "rise":    {"freq": 45, "steps": [(0.2, 1, 20000), (1, 1, 70000)]},   # builds over 20 s, then holds
+    "knock":   {"freq": 45, "steps": [(1, 1, 120), (0, 0, 120), (1, 1, 120), (0, 0, 120), (1, 1, 120), (0, 0, 900)]},
 }
+DEFAULT = "classic"   # played if an alarm names a type this code doesn't know
 
 _pwm = PWM(Pin(PIN))
 _pwm.duty_u16(0)

@@ -6,8 +6,8 @@ message to on_message(topic, payload). Nothing here raises on network trouble: t
 just stays offline and service() keeps retrying, so alarms keep working.
 
 Each time it gets online it sets the clock from NTP, connects to the broker (last-will
-"offline", retained), publishes "online" (retained) and subscribes to the command and alarm
-topics; the retained alarm lists arrive right away. clock_ok() is False until NTP has worked
+"offline", retained), publishes "online" (retained) and subscribes to the command, alarm and
+settings topics; the retained alarm lists and alarm type arrive right away. clock_ok() is False until NTP has worked
 once since boot: the Pico has no clock battery, so until then its time is meaningless.
 
 Connecting to the broker blocks for a few seconds (TLS), so service(busy=True) skips it
@@ -30,6 +30,7 @@ BASE_TOPIC = "shakeawake/" + env.DEVICE_ID + "/"
 STATUS_TOPIC = BASE_TOPIC + "status"
 CMD_TOPIC = BASE_TOPIC + "cmd"
 ALARM_TOPICS = {BASE_TOPIC + "alarms/calendar": "calendar", BASE_TOPIC + "alarms/manual": "manual"}
+SETTINGS_TOPIC = BASE_TOPIC + "settings"   # the alarm type every alarm plays
 KEEPALIVE_S = 120         # if we go silent this long (x1.5), the broker publishes the last-will
 PING_MS = 60_000          # ping well inside the keepalive; longer = less data
 RECONNECT_MS = 30_000     # while offline, how often to retry
@@ -146,8 +147,8 @@ def _go_online():
         client.connect(timeout=CONNECT_TIMEOUT_S)
         client.publish(STATUS_TOPIC, "online", retain=True)
         client.subscribe(CMD_TOPIC)
-        for topic in ALARM_TOPICS:
-            client.subscribe(topic, qos=1)   # retained, so the saved lists arrive right away
+        for topic in list(ALARM_TOPICS) + [SETTINGS_TOPIC]:
+            client.subscribe(topic, qos=1)   # retained, so the saved lists and type arrive right away
     except Exception as e:   # any failure here just means still offline
         _close(client)
         print("MQTT: couldn't connect,", repr(e), "- retrying in", RECONNECT_MS // 1000, "s")

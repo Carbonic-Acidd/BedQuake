@@ -5,7 +5,7 @@ eyes or ears. Do one step at a time.
 
 ## 1. Restructure (done when the shaker works as before)
 New layout, one `.env`, and `make run` plays the shaker patterns. No network yet.
-Check: `make run` and feel the pulse pattern; Ctrl-C stops it.
+Check: `make run` and feel the classic alarm type; Ctrl-C stops it.
 
 ## 2. Pico joins Wi-Fi and the broker
 `net.py` joins Wi-Fi and connects to EMQX Serverless over TLS (port 8883). It publishes a
@@ -60,9 +60,10 @@ The website calls the Worker's `/api`; the Worker publishes through EMQX's REST 
 | Topic | Direction | Retained / QoS | Payload | Sent by |
 |---|---|---|---|---|
 | `shakeawake/<id>/status` | Pico -> broker | yes (+ last-will) | `online`, last-will `offline` | the Pico |
-| `shakeawake/<id>/cmd` | Worker -> Pico | no / 0 | `{"cmd": "test", "pattern": "breathe", "seconds": 10}` (max 90) or `{"cmd": "stop"}` | `POST /api/test`, `POST /api/stop` |
-| `shakeawake/<id>/alarms/manual` | Worker -> Pico | yes / 1 | `{"v": 1, "gen": 1763290000, "alarms": [[1763290800, "pulse"]]}`; `"alarms": []` clears it | `PUT /api/alarm`, `DELETE /api/alarm` |
+| `shakeawake/<id>/cmd` | Worker -> Pico | no / 0 | `{"cmd": "test", "pattern": "waves", "seconds": 10}` (max 90) or `{"cmd": "stop"}` | `POST /api/test`, `POST /api/stop` |
+| `shakeawake/<id>/alarms/manual` | Worker -> Pico | yes / 1 | `{"v": 1, "gen": 1763290000, "alarms": [[1763290800, "classic"]]}`; `"alarms": []` clears it | `PUT /api/alarm`, `DELETE /api/alarm` |
 | `shakeawake/<id>/alarms/calendar` | Worker -> Pico | yes / 1 | same shape, up to 7 alarms | nightly cron (08:00 UTC), `POST /api/sync` |
+| `shakeawake/<id>/settings` | Worker -> Pico | yes / 1 | `{"v": 1, "pattern": "rise"}`: the alarm type every alarm plays (calendar and custom) | `PUT /api/type` |
 
 Calendar alarms: for each of the next 7 days (America/New_York), the first timed event's
 start minus `ALARM_OFFSET_MIN`. All-day and cancelled events are ignored, days without events
@@ -70,7 +71,11 @@ get no alarm, and only future alarms are sent. If the calendar can't be read, no
 published, so the Pico keeps the last good list.
 
 The website can't see the Pico (EMQX Serverless's API can't read retained messages), so it
-only shows whether each command reached the broker. Its pattern list must match `pico/shaker.py`.
+only shows whether each command reached the broker. Its alarm types must match `pico/shaker.py`.
+
+Alarm types (`pico/shaker.py`): classic, waves, rise, knock. The type chosen on the website
+(the settings topic, saved to `type.json`) overrides each alarm's own; an alarm naming an unknown
+type plays classic, so a renamed type can never silence an alarm.
 
 Alarms on the Pico (`pico/alarms.py`): each list is checked, then saved to its own file in
 flash (`calendar.json`, `manual.json`; written to a temp file and renamed, so a power cut

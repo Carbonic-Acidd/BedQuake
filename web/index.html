@@ -2,67 +2,120 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#030b1e">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A192C">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon-192.png">
   <!-- iPhone: home screen icon, name, and full-screen launch -->
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Shake Awake">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,500;0,700;1,800&display=swap">
+  <link rel="stylesheet" href="/src/tokens.css">
+  <link rel="stylesheet" href="/src/style.css">
   <title>Shake Awake</title>
-  <style>
-    body { margin: 0; background: #030b1e; color: #eee; font: 18px system-ui, sans-serif; }
-    main { max-width: 420px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 16px; }
-    h1, h2, p { margin: 0; }
-    h1 img { display: block; width: 300px; max-width: 85%; height: auto; margin: 0 auto; }
-    h2 { font-size: 14px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; }
-    .card { display: grid; gap: 8px; padding: 16px; border-radius: 16px; background: #0c1631; }
-    .small { color: #999; font-size: 14px; }
-    #result { min-height: 1.4em; text-align: center; color: #e5b83b; }
-    #patterns, .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    button { min-height: 64px; border: 0; border-radius: 12px; background: #1c2a4d; color: #eee;
-             font: inherit; text-transform: capitalize; }
-    #stop { min-height: 88px; background: #c33; font-size: 24px; font-weight: 700; }
-    input, select { min-height: 48px; border: 1px solid #2a3a63; border-radius: 12px; background: #101d3d;
-                    color: #eee; font: inherit; padding: 0 12px; text-transform: capitalize; }
-  </style>
 </head>
 <body>
-  <main>
-    <h1><img src="/logo.png" alt="Shake Awake" width="900" height="133"></h1>
+  <!-- Shared art: the accent gradient and the logo's waveform, traced from icon-512.png -->
+  <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="accent">
+        <stop offset="0" style="stop-color: var(--accent-start)"/>
+        <stop offset="0.55" style="stop-color: var(--accent-mid)"/>
+        <stop offset="1" style="stop-color: var(--accent-end)"/>
+      </linearGradient>
+      <symbol id="wave-logo" viewBox="50 140 416 240">
+        <path d="M68 307 L118 307 L212 160 L282 359 L338 244 L385 323 L448 230" fill="none" stroke="url(#accent)"
+              style="stroke-width: var(--wave-stroke-logo)" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    </defs>
+  </svg>
 
-    <p id="result" role="status"></p>
+  <!-- Locked: only the logo and one control: type the password into the track, then slide the
+       handle across it. The password is needed every time. -->
+  <form id="lock" class="lock">
+    <img class="lock-logo" src="/logo.png" alt="Shake Awake" width="900" height="133">
+    <div id="slide" class="slide">
+      <input id="password" type="password" autocomplete="current-password" enterkeyhint="go"
+             placeholder="Enter password" aria-label="Password">
+      <button id="slide-thumb" class="slide-thumb" type="button" aria-label="Slide to unlock">
+        <svg><use href="#wave-logo"/></svg>
+      </button>
+    </div>
+  </form>
 
-    <form id="login" class="card" hidden>
-      <h2>Password</h2>
-      <p id="login-note" class="small"></p>
-      <input id="password" type="password" autocomplete="current-password" required>
-      <button>Save</button>
-    </form>
+  <main id="app" class="app" hidden>
+    <header class="top">
+      <img class="brand-logo" src="/logo.png" alt="Shake Awake" width="900" height="133">
+    </header>
 
-    <div id="patterns"></div>
-    <button id="stop">Stop</button>
+    <!-- One device: the screen, the knob, the custom alarm and the keys share a single body -->
+    <div class="device">
+      <!-- The screen: the next alarm, how long until it, the live trace of the type on the knob,
+           and the alarm type that's set -->
+      <section id="screen" class="screen rise" style="--i: 0" aria-label="Next alarm">
+        <div class="screen-head">
+          <p id="next-label" class="screen-label"></p>
+          <button id="sync" class="sync" aria-label="Sync calendar">
+            <svg class="icon icon-sync" viewBox="0 0 24 24"><path d="M19.5 10.5a7.5 7.5 0 0 0-13.4-3.4M4.5 13.5a7.5 7.5 0 0 0 13.4 3.4M5 3.5v4h4M19 20.5v-4h-4"/></svg>
+            <svg class="icon icon-done" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+          </button>
+        </div>
+        <p class="screen-time"><span id="next-time"></span><span id="next-period" class="screen-period"></span></p>
+        <p id="next-until" class="screen-until"></p>
+        <div id="wave" class="trace" aria-hidden="true">
+          <svg viewBox="0 0 1000 200" preserveAspectRatio="none">
+            <linearGradient id="accent-live" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1000" y2="0">
+              <stop offset="0" style="stop-color: var(--accent-start)"/>
+              <stop offset="0.55" style="stop-color: var(--accent-mid)"/>
+              <stop offset="1" style="stop-color: var(--accent-end)"/>
+            </linearGradient>
+            <path id="wave-path" d="M0 100 L1000 100" vector-effect="non-scaling-stroke"/>
+          </svg>
+        </div>
+        <p class="screen-foot">Alarm type <span id="current-type" class="screen-type"></span></p>
+      </section>
 
-    <section class="card">
-      <h2>Calendar</h2>
-      <p id="next-alarm">Not checked yet</p>
-      <p class="small">Sync reads the calendar and sends the next 7 days' alarms to the Shake Awake.
-        It also runs when this page opens, and every night.</p>
-      <button id="sync">Sync now</button>
-    </section>
-
-    <section class="card">
-      <h2>Alarm</h2>
-      <p class="small">One alarm at a time: setting a new one replaces the last. Calendar alarms are separate.</p>
-      <input id="alarm-time" type="datetime-local">
-      <select id="alarm-pattern"></select>
-      <div class="row">
-        <button id="alarm-set">Set alarm</button>
-        <button id="alarm-clear">Clear</button>
+      <!-- The knob: turn it to choose an alarm type, press its cap to set it -->
+      <div id="deck" class="deck rise" style="--i: 1">
+        <div id="knob-labels" class="knob-labels"></div>
+        <div class="knob-scale" aria-hidden="true"></div>
+        <div id="knob" class="knob" role="slider" tabindex="0" aria-label="Alarm type" aria-valuemin="0" aria-valuemax="3">
+          <span class="knob-pointer"></span>
+        </div>
+        <button id="knob-cap" class="knob-cap">
+          <span class="cap-set">Set</span>
+          <svg class="icon cap-done" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </button>
       </div>
-    </section>
+
+      <div id="custom" class="custom rise" style="--i: 2">
+        <label id="custom-pick" class="custom-pick">
+          <svg class="icon icon-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <svg class="icon icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>
+          <span id="custom-text"></span>
+          <input id="custom-input" type="datetime-local" aria-label="Custom alarm date and time">
+        </label>
+        <button id="custom-clear" class="custom-clear" aria-label="Clear custom alarm">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>
+        </button>
+      </div>
+
+      <div class="keys rise" style="--i: 3">
+        <button id="try" class="key">
+          <svg class="icon icon-fill" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg><span id="try-text">Try</span>
+          <span class="try-bar" aria-hidden="true"></span>
+        </button>
+        <button id="stop" class="key stop">
+          <svg class="icon icon-fill" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3.1"/></svg>Stop
+        </button>
+      </div>
+    </div>
+
+    <p id="status" class="status" role="status"></p>
   </main>
   <script type="module" src="/src/main.js"></script>
 </body>
