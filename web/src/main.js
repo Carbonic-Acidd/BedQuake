@@ -54,11 +54,12 @@ let previewTimer = 0
 let statusTimer = 0
 
 // ---------- Small helpers ----------
-function shake(element) {
-  element.classList.remove('shake')
+// `kind` is 'shake', or 'nudge' for a smaller one (style.css).
+function shake(element, kind = 'shake') {
+  element.classList.remove(kind)
   void element.offsetWidth   // restart the animation
-  element.classList.add('shake')
-  setTimeout(() => element.classList.remove('shake'), SHAKE_MS)
+  element.classList.add(kind)
+  setTimeout(() => element.classList.remove(kind), SHAKE_MS)
 }
 
 function showStatus(text) {
@@ -212,19 +213,32 @@ async function chooseType() {
 }
 
 // Plays the type the knob points at on the shaker for a few seconds.
+// It only shows as playing once the Worker says the Pico got it, so an offline Pico never
+// looks like it was about to play.
 async function tryType() {
-  preview = NAMES[browse]
+  if (picoOnline === false || $('try').classList.contains('sending')) return refuse($('try'))
+  const name = NAMES[browse]
+  $('try').classList.add('sending')
+  const reply = await run(() => api.test(name, TEST_SECONDS))
+  $('try').classList.remove('sending')
+  if (!reply) return
+  if (!reply.delivered) return refuse($('try'))   // nobody heard it (run() has turned the indicator red)
+  preview = name
   $('app').removeAttribute('data-playing')   // restart the Try countdown bar
   void $('app').offsetWidth
   clearTimeout(previewTimer)
   previewTimer = setTimeout(endPreview, TEST_SECONDS * 1000)
   render()
-  const reply = await run(() => api.test(preview, TEST_SECONDS))
-  if (!reply) return endPreview()
-  if (reply.delivered === false) {   // nobody heard it: don't pretend it's playing
-    endPreview()
-    showStatus('The Pico is offline')
-  }
+}
+
+// The Pico can't hear: the key that was pressed gives a small shake and the red indicator
+// flares (it doesn't move).
+function refuse(key) {
+  if (picoOnline !== false) return   // still sending, not refused
+  shake(key, 'nudge')
+  $('pico').classList.remove('flare')
+  void $('pico').offsetWidth
+  $('pico').classList.add('flare')
 }
 
 function endPreview() {
@@ -233,9 +247,12 @@ function endPreview() {
   render()
 }
 
+// Always sent, even when the Pico looks offline: the indicator can lag by a few seconds, and if
+// the shaker is running, Stop must get through.
 async function stop() {
   endPreview()
-  await run(api.stop)
+  const reply = await run(api.stop)
+  if (reply && !reply.delivered) refuse($('stop'))
 }
 
 // Sends the picked time as the custom alarm (replacing the last one).
@@ -412,8 +429,12 @@ async function checkPico() {
     else setPico(null)   // couldn't ask: hide the indicator rather than guess
   }
 }
+let picoOnline = null   // true, false, or null (not known yet)
 function setPico(online) {
-  $('pico').dataset.state = online === null ? 'unknown' : online ? 'online' : 'offline'
+  picoOnline = online
+  const state = online === null ? 'unknown' : online ? 'online' : 'offline'
+  $('pico').dataset.state = state
+  $('app').dataset.pico = state   // the screen and Try look different while it's offline
   $('pico-text').textContent = online ? 'Pico online' : 'Pico offline'
 }
 

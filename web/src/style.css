@@ -47,6 +47,13 @@ button:active { transform: scale(var(--press-scale)); }
   60% { translate: 0.25rem; }
   75% { translate: -0.1rem; }
 }
+.nudge { animation: nudge var(--dur-slow) var(--ease-out); }   /* a smaller shake (Try refused) */
+@keyframes nudge {
+  15% { translate: -0.3rem; }
+  35% { translate: 0.22rem; }
+  55% { translate: -0.12rem; }
+  75% { translate: 0.05rem; }
+}
 @keyframes spin { to { rotate: 1turn; } }
 @keyframes pop { from { scale: 0.4; } }
 
@@ -225,6 +232,10 @@ button:active { transform: scale(var(--press-scale)); }
   stroke-linejoin: round;
 }
 .trace[data-live] svg { filter: var(--glow-drop); }
+/* Pico offline: the trace loses its signal (grey and dim) and Try looks muted */
+.trace svg { transition: filter var(--dur-slow) var(--ease-out), opacity var(--dur-slow) var(--ease-out); }
+.app[data-pico="offline"] .trace svg { filter: grayscale(1); opacity: 0.3; }
+.app[data-pico="offline"] :is(#try, .stop) { color: var(--ink-faint); background: var(--navy-800); box-shadow: var(--shadow-inset); }
 .trace path { transition: stroke-width var(--dur) var(--ease-out); }
 .app[data-playing] .trace svg { filter: var(--glow-drop-strong); }
 .app[data-playing] .trace path { stroke-width: var(--wave-stroke-preview); }
@@ -246,6 +257,10 @@ button:active { transform: scale(var(--press-scale)); }
 .pico[data-state="online"] { color: var(--status-online); }
 .pico[data-state="offline"] { color: var(--status-offline); }
 .pico[data-state="offline"] .pico-dot { --dot: var(--status-offline); }
+.pico.flare .pico-dot { animation: flare 0.9s var(--ease-out); }   /* Try refused: the red dot flares */
+@keyframes flare {
+  30% { scale: 1.9; box-shadow: 0 0 1rem var(--dot), 0 0 0 0.3rem color-mix(in srgb, var(--dot) 30%, transparent); }
+}
 .screen-type {
   margin-left: var(--space-2);
   color: var(--ink);
@@ -391,6 +406,7 @@ button:active { transform: scale(var(--press-scale)); }
 .key { height: var(--control-h); }
 /* While Try plays: a bar on it that drains over the preview's length (--try-ms, set by main.js) */
 #try { position: relative; overflow: hidden; }
+#try.sending .icon { animation: throb 0.8s var(--ease-out) infinite; }   /* waiting to hear it arrived */
 .try-bar {
   position: absolute;
   left: 0;
