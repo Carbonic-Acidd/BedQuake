@@ -44,9 +44,18 @@ To change it: edit `.env`, run `make secrets`, and type the new one on each devi
 page asks again by itself). With no `APP_PASSWORD` set, nobody can use `/api`.
 
 ### Deploy
+Pushing to `main` deploys the Worker automatically when `backend/` or `web/` changed
+(`.github/workflows/deploy.yml`; watch it in the repo's **Actions** tab). One-time setup:
+1. Cloudflare dashboard > **Manage Account** > **Account API Tokens** > **Create Token** >
+   template **Edit Cloudflare Workers**, limited to your account. Copy the token.
+2. Copy the **Account ID** from the **Workers & Pages** overview page.
+3. GitHub repo > **Settings** > **Secrets and variables** > **Actions** > **New repository
+   secret**: add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+
+Still by hand:
 ```
-make secrets          # after changing any backend value in .env
-make backend-deploy   # after changing backend/ or web/
+make secrets          # after changing any backend value in .env (CI never sees them)
+make backend-deploy   # deploy from the laptop without pushing (e.g. to try something)
 make run              # after changing pico/ (with the Pico plugged in)
 ```
 Logs and each request's CPU time: dashboard > **Workers & Pages** > **shakeawake** >
@@ -63,6 +72,7 @@ Logs and each request's CPU time: dashboard > **Workers & Pages** > **shakeawake
 
 ## Files
 - `Makefile`: every command above.
+- `.github/workflows/deploy.yml`: deploys the Worker on every push to `main` (GitHub Actions).
 - `.env.example`: the config keys; copy it to `.env` (never committed) for real values.
 - `requirements.txt`: laptop Python tools (mpremote, python-dotenv).
 - `PLAN.md`: the roadmap and the MQTT topics contract.
