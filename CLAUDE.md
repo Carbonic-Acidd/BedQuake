@@ -4,7 +4,7 @@ Silent bed-shaker alarm. Pico WH (MicroPython) -> TPA3116 amp -> bass shaker.
 PWA website (Vite, plain JS) -> /api on a Cloudflare Worker (backend/, Python + FastAPI, also
 serves the site) -> EMQX Serverless REST publish API -> broker (TLS only) -> Pico over MQTT.
 The website never talks to MQTT and holds no secrets. Every /api request needs the shared
-password (APP_PASSWORD, typed on every visit and kept only in memory, sent as "Authorization: Bearer");
+password (APP_PASSWORD, typed into the page once per device, sent as "Authorization: Bearer");
 the Worker checks it in entry.py. No Cloudflare Access (Zero Trust wants a card).
 Nightly cron turns ICS_URL into calendar alarms.
 Team final project for Northeastern's Cornerstone of Engineering.

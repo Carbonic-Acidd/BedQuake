@@ -70,12 +70,16 @@ start minus `ALARM_OFFSET_MIN`. All-day and cancelled events are ignored, days w
 get no alarm, and only future alarms are sent. If the calendar can't be read, nothing is
 published, so the Pico keeps the last good list.
 
-The website can't see the Pico (EMQX Serverless's API can't read retained messages), so it
-only shows whether each command reached the broker. Its alarm types must match `pico/shaker.py`.
+The website can't read the Pico's messages (EMQX Serverless's API can't read retained ones), so
+it only shows whether each command reached the broker. It does show whether the Pico is online:
+`GET /api/status` asks EMQX's Clients API whether client `shakeawake-<id>` (the Pico's MQTT
+client id) is connected. A Pico that lost power shows offline once its keepalive runs out (about
+3 minutes). Its alarm types must match `pico/shaker.py`.
 
-Alarm types (`pico/shaker.py`): classic, waves, rise, knock. The type chosen on the website
-(the settings topic, saved to `type.json`) overrides each alarm's own; an alarm naming an unknown
-type plays classic, so a renamed type can never silence an alarm.
+Alarm types (`pico/shaker.py`): classic (short, short, long), waves (slow swell), rise (silent to
+full strength over 20 s, or 10 s in a test, then holds), knock (three quick taps). The type
+chosen on the website (the settings topic, saved to `type.json`) overrides each alarm's own; an
+alarm naming an unknown type plays classic, so a renamed type can never silence an alarm.
 
 Alarms on the Pico (`pico/alarms.py`): each list is checked, then saved to its own file in
 flash (`calendar.json`, `manual.json`; written to a temp file and renamed, so a power cut

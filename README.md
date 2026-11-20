@@ -38,10 +38,11 @@ secret; anything else gets a 401 and nothing is sent to the Pico.
 1. Put a long passphrase in `APP_PASSWORD` (four or five random words; plain letters,
    numbers and spaces).
 2. `make secrets`, then `make backend-deploy`.
-3. Open the site, type the password and slide to unlock. It's asked for on every visit and
-   never saved on the device, so a phone left unlocked doesn't stay logged in.
+3. Open the site on each phone, type the password and slide to unlock; that device remembers
+   it and unlocks by itself next time.
 
-To change it: edit `.env` and run `make secrets`; the next unlock needs the new one.
+To change it: edit `.env`, run `make secrets`, and type the new one on each device (the
+page asks again by itself).
 With no `APP_PASSWORD` set, nobody can use `/api`.
 
 ### Deploy
@@ -83,7 +84,7 @@ page's Sync button, and opening the page).
 - `backend/wrangler.jsonc`: the Cloudflare Worker's config; serves `web/dist` and sends `/api/*` to Python.
 - `backend/pyproject.toml`: the Worker's Python packages: FastAPI, icalendar, recurring-ical-events (`uv.lock` and `pylock.toml` pin them).
 - `backend/src/entry.py`: the Worker: the password check and the `/api` endpoints.
-- `backend/src/emqx.py`: publishes MQTT messages through EMQX's REST API.
+- `backend/src/emqx.py`: EMQX's REST API: publishes MQTT messages, and asks whether the Pico is connected.
 - `backend/src/calendar_job.py`: reads the calendar (`ICS_URL`) and works out the next 7 days' alarms.- `pico/main.py`: runs on boot and wires the shaker, alarms and network together.
 - `pico/shaker.py`: drives the shaker; the alarm types (classic, waves, rise, knock) are defined at the top (keep `TYPES` in `web/src/main.js` in sync, names and steps).
 - `pico/net.py`: Wi-Fi, clock (NTP) and MQTT; never blocks waiting for Wi-Fi.
@@ -92,7 +93,7 @@ page's Sync button, and opening the page).
 - `web/package.json`: web dependencies (Vite).
 - `web/index.html`: the page: a lock screen, then one screen of controls.
 - `web/src/main.js`: the page's behavior: password + slide to unlock, the next alarm, the alarm type knob (turn to choose, press to set), Try, the custom alarm, Sync, Stop.
-- `web/src/api.js`: the only code that calls the Worker's `/api`; holds the password in memory only (typed on every visit).
+- `web/src/api.js`: the only code that calls the Worker's `/api`; remembers the password on this device.
 - `web/src/wave.js`: draws the live trace on the screen for the alarm type the knob points at.
 - `web/src/tokens.css`: the design tokens (colors, type, spacing, radii, depth, motion), all from the logo.
 - `web/src/style.css`: layout and components, built only from the tokens.

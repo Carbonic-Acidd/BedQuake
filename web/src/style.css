@@ -229,7 +229,23 @@ button:active { transform: scale(var(--press-scale)); }
 .app[data-playing] .trace svg { filter: var(--glow-drop-strong); }
 .app[data-playing] .trace path { stroke-width: var(--wave-stroke-preview); }
 
-.screen-foot { color: var(--ink-dim); font-weight: var(--weight-strong); }
+.screen-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--ink-dim);
+  font-weight: var(--weight-strong);
+}
+
+/* Is the Pico connected? A small dot: green when online, red when offline */
+.pico { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); white-space: nowrap; }
+.pico[data-state="unknown"] { visibility: hidden; }
+.pico-dot { --dot: var(--status-online); width: var(--space-2); height: var(--space-2); border-radius: 50%;
+            background: var(--dot); box-shadow: 0 0 0.5rem color-mix(in srgb, var(--dot) 70%, transparent); }
+.pico[data-state="online"] { color: var(--status-online); }
+.pico[data-state="offline"] { color: var(--status-offline); }
+.pico[data-state="offline"] .pico-dot { --dot: var(--status-offline); }
 .screen-type {
   margin-left: var(--space-2);
   color: var(--ink);

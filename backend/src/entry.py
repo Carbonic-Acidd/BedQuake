@@ -17,6 +17,7 @@ import emqx
 CONFIG_KEYS = ["ICS_URL", "EMQX_API_URL", "EMQX_API_KEY", "EMQX_API_SECRET",
                "ALARM_OFFSET_MIN", "DEVICE_ID", "APP_PASSWORD"]
 DEFAULT_DEVICE_ID = "bed1"
+PICO_CLIENT_PREFIX = "shakeawake-"   # the Pico's MQTT client id is this + DEVICE_ID (pico/net.py)
 MAX_TEST_S = 90           # the Pico won't play a test longer than this either
 PAYLOAD_VERSION = 1       # the "v" field in alarm messages, bumped if their shape changes
 
@@ -37,8 +38,12 @@ class AlarmType(BaseModel):
     pattern: str = Field(min_length=1, max_length=20)
 
 
+def device_id(env):
+    return getattr(env, "DEVICE_ID", None) or DEFAULT_DEVICE_ID
+
+
 def topic(env, name):
-    return f"shakeawake/{getattr(env, 'DEVICE_ID', None) or DEFAULT_DEVICE_ID}/{name}"
+    return f"shakeawake/{device_id(env)}/{name}"
 
 
 async def send(env, name, payload, retain=False):
@@ -68,6 +73,18 @@ async def health(request: Request):
     # Names only, never values, so a missing secret is easy to spot.
     missing = [key for key in CONFIG_KEYS if not getattr(env, key, None)]
     return {"ok": True, "missing_config": missing}
+
+
+# Whether the Pico is connected to the broker right now. EMQX notices a Pico that lost power
+# or Wi-Fi only after its keepalive runs out (up to about 3 minutes, see pico/net.py).
+@app.get("/api/status")
+async def status(request: Request):
+    env = request.scope["env"]
+    try:
+        online = await emqx.connected(env, PICO_CLIENT_PREFIX + device_id(env))
+    except RuntimeError as e:
+        raise HTTPException(502, str(e))
+    return {"ok": True, "online": online}
 
 
 @app.post("/api/test")

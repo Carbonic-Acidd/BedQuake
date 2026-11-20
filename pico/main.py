@@ -15,9 +15,9 @@ MAX_RUN_S = 90          # alarms play this long unless stopped; tests can't be l
 stop_at = None          # ticks_ms when the playing pattern stops; None when silent
 
 
-def play(name, seconds):
+def play(name, seconds, test=False):
     global stop_at
-    shaker.start(name)
+    shaker.start(name, test)
     stop_at = time.ticks_add(time.ticks_ms(), int(seconds * 1000))
     print("Playing", name, "for", seconds, "s")
 
@@ -45,7 +45,7 @@ def on_message(topic, payload):
         except Exception as e:
             print("Ignored bad command:", payload, repr(e))
             return
-        play(name, seconds)
+        play(name, seconds, test=True)
     elif topic == net.SETTINGS_TOPIC:
         try:
             if alarms.set_type(payload, shaker.PATTERNS):

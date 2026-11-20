@@ -1,4 +1,5 @@
-// The page: type the password and slide to unlock (the Worker checks it), then one screen:
+// The page: type the password and slide to unlock (the Worker checks it; this device then
+// remembers it and unlocks by itself next time), then one screen:
 // the screen panel (next alarm, current alarm type), the knob (turn to choose a type, press its
 // cap to set it), the custom alarm chip, Try and Stop.
 // The Worker can't see the Pico or tell us anything back, so this device remembers the alarm
@@ -7,14 +8,17 @@
 import * as api from './api.js'
 import { liveWave } from './wave.js'
 
-// Alarm types: name -> steps (start strength, end strength, ms), copied from pico/shaker.py.
-// Keep them in sync.
+// Alarm types and how the trace draws them: name -> steps (start strength, end strength, ms),
+// the same as pico/shaker.py except Rise's long hold is drawn short, so its climb from silence
+// fills most of the screen. Keep the names and the other steps in sync with shaker.py.
 const TYPES = {
   classic: [[1, 1, 300], [0, 0, 300], [1, 1, 300], [0, 0, 300], [1, 1, 1500], [0, 0, 1000]],
   waves: [[0, 1, 2000], [1, 0, 2000]],
-  rise: [[0.2, 1, 20000], [1, 1, 70000]],
+  rise: [[0, 1, 20000], [1, 1, 8000]],      // shaker.py: 0 -> full over 20 s, then holds 70 s
   knock: [[1, 1, 120], [0, 0, 120], [1, 1, 120], [0, 0, 120], [1, 1, 120], [0, 0, 900]],
 }
+const TRY_TYPES = { rise: [[0, 1, 10000], [1, 1, 4000]] }   // Try plays Rise's faster climb (10 s)
+const VIEWS = { knock: 'cycle', rise: 'pinned' }   // how the trace draws each type (wave.js); others scroll
 const NAMES = Object.keys(TYPES)
 const title = (name) => name[0].toUpperCase() + name.slice(1)   // "classic" -> "Classic"
 const DEFAULT_TYPE = 'classic'
@@ -149,7 +153,8 @@ function render() {
   // The trace plays "Try" at full height and the type on the knob a little lower; the screen
   // glows brighter (dawn) as the alarm gets closer
   const height = preview ? HEIGHTS.preview : shown !== alarmType ? HEIGHTS.browsing : next ? HEIGHTS.armed : HEIGHTS.idle
-  setWave(TYPES[preview || shown], height)
+  const drawn = preview || shown
+  setWave(preview ? TRY_TYPES[preview] || TYPES[preview] : TYPES[shown], height, VIEWS[drawn])
   $('wave').toggleAttribute('data-live', Boolean(preview || next))
   $('app').toggleAttribute('data-playing', Boolean(preview))
   $('try-text').textContent = preview ? 'Playing' : 'Try'
@@ -317,18 +322,19 @@ function setSlide(value) {
   $('slide').style.setProperty('--x', value * travel() + 'px')
 }
 
-// Asks for the password: empties the track and shows `hint` in it.
+// Asks for the password: empties the track and shows `hint` in it. With a remembered password
+// the handle stays lit, so sliding alone tries again.
 function askPassword(hint = 'Enter password') {
   setSlide(0)
   $('password').value = ''
   $('password').placeholder = hint
-  $('slide').toggleAttribute('data-ready', false)
+  $('slide').toggleAttribute('data-ready', api.hasPassword())
 }
 
-$('password').oninput = () => $('slide').toggleAttribute('data-ready', $('password').value !== '')
+$('password').oninput = () => $('slide').toggleAttribute('data-ready', $('password').value !== '' || api.hasPassword())
 $('slide-thumb').onpointerdown = (event) => {
   if (checking) return
-  if (!$('password').value) {   // nothing typed yet: point at the field instead of sliding
+  if (!$('password').value && !api.hasPassword()) {   // nothing typed yet: point at the field instead
     $('password').focus()
     return shake($('slide'))
   }
@@ -350,11 +356,11 @@ $('slide-thumb').onkeydown = (event) => {   // keyboard: Enter or Space unlocks
   if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); login() }
 }
 
-// Checks the typed password with the Worker.
+// Checks the typed password (or the remembered one) with the Worker.
 async function login() {
   if (checking) return
   const typed = $('password').value
-  if (!typed) {
+  if (!typed && !api.hasPassword()) {
     $('password').focus()
     return shake($('slide'))
   }
@@ -383,8 +389,23 @@ function unlock() {
     void $('app').offsetWidth
     $('app').classList.add('enter')
   })
-  askPassword()   // the password lives only inside api.js from here on
+  askPassword()   // the password lives inside api.js (and this device's storage) from here on
   sync()
+  checkPico()
+}
+
+// ---------- Is the Pico online? (connected to the broker right now) ----------
+async function checkPico() {
+  try {
+    setPico(await api.picoOnline())
+  } catch (error) {
+    if (error.message === 'wrong password') showLock()
+    else setPico(null)   // couldn't ask: hide the indicator rather than guess
+  }
+}
+function setPico(online) {
+  $('pico').dataset.state = online === null ? 'unknown' : online ? 'online' : 'offline'
+  $('pico-text').textContent = online ? 'Pico online' : 'Pico offline'
 }
 
 // Back to the lock screen (the password stopped working).
@@ -419,8 +440,15 @@ $('app').style.setProperty('--try-ms', TEST_SECONDS * 1000 + 'ms')   // how long
 $('stop').onclick = stop
 $('sync').onclick = sync
 $('lock').onsubmit = (event) => { event.preventDefault(); login() }
-setInterval(() => { if (!$('app').hidden) render() }, TICK_MS)
+setInterval(() => {
+  if ($('app').hidden) return
+  render()
+  checkPico()
+}, TICK_MS)
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden) checkPico() })
 
-$('password').focus()
+// A remembered password unlocks by itself; otherwise wait for one to be typed.
+if (api.hasPassword()) login()
+else $('password').focus()
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')

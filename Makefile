@@ -38,11 +38,11 @@ logs: ## Open the Pico's REPL to see its output (Ctrl-] exits)
 backend-dev: ## Build the website and run the Worker locally at http://localhost:8787
 	$(PY) scripts/gen_dev_vars.py
 	npm --prefix web run build
-	cd backend && uv run pywrangler dev --test-scheduled
+	cd backend && uv run --no-active pywrangler dev --test-scheduled
 
 backend-deploy: ## Build the website and deploy the Worker to Cloudflare
 	npm --prefix web run build
-	cd backend && uv run pywrangler deploy
+	cd backend && uv run --no-active pywrangler deploy
 
 secrets: ## Upload the backend's values from .env to Cloudflare as Worker secrets
 	$(PY) scripts/gen_dev_vars.py --upload

@@ -15,6 +15,9 @@
   --accent-start: #F6400C;   /* left end of the waveform */
   --accent-mid: #FF7421;
   --accent-end: #FEBC2B;     /* right end of the waveform */
+  /* The only colors not from the logo: whether the Pico is online (green) or offline (red) */
+  --status-online: #3DDC84;
+  --status-offline: #FF4D5E;
 
   --accent: linear-gradient(90deg, var(--accent-start), var(--accent-mid) 55%, var(--accent-end));
   --surface: linear-gradient(165deg, var(--navy-800), var(--navy-900) 70%);   /* the icon's own fade */

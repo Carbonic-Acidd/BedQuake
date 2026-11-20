@@ -1,5 +1,6 @@
 # Drives the bass shaker through the amp. Knows nothing about Wi-Fi or MQTT.
 # Use: start("classic"), then call update() every ~10 ms. stop() silences it.
+# start(name, test=True) plays a type's "test_steps" if it has them (Rise climbs faster in a test).
 from machine import Pin, PWM
 import math
 import time
@@ -13,7 +14,8 @@ MAX_STRENGTH = 1.0    # 1.0 = 50% duty, the strongest. Lower it if the amp's pro
 PATTERNS = {
     "classic": {"freq": 45, "steps": [(1, 1, 300), (0, 0, 300), (1, 1, 300), (0, 0, 300), (1, 1, 1500), (0, 0, 1000)]},
     "waves":   {"freq": 60, "steps": [(0, 1, 2000), (1, 0, 2000)]},
-    "rise":    {"freq": 45, "steps": [(0.2, 1, 20000), (1, 1, 70000)]},   # builds over 20 s, then holds
+    "rise":    {"freq": 45, "steps": [(0, 1, 20000), (1, 1, 70000)],        # silent to full over 20 s, then holds
+                "test_steps": [(0, 1, 10000), (1, 1, 80000)]},               # a test climbs over 10 s
     "knock":   {"freq": 45, "steps": [(1, 1, 120), (0, 0, 120), (1, 1, 120), (0, 0, 120), (1, 1, 120), (0, 0, 900)]},
 }
 DEFAULT = "classic"   # played if an alarm names a type this code doesn't know
@@ -25,11 +27,11 @@ _length = 0     # total ms of one loop of the pattern
 _start = 0      # ticks_ms when the pattern started
 
 
-def start(name):
+def start(name, test=False):
     global _steps, _length, _start
     pattern = PATTERNS[name]
     _pwm.freq(pattern["freq"])
-    _steps = pattern["steps"]
+    _steps = pattern.get("test_steps", pattern["steps"]) if test else pattern["steps"]
     _length = sum(step[2] for step in _steps)
     _start = time.ticks_ms()
     update()

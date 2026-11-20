@@ -35,7 +35,7 @@
   </svg>
 
   <!-- Locked: only the logo and one control: type the password into the track, then slide the
-       handle across it. The password is needed every time. -->
+       handle across it. This device remembers it after that. -->
   <form id="lock" class="lock">
     <img class="lock-logo" src="/logo.png" alt="Shake Awake" width="900" height="133">
     <div id="slide" class="slide">
@@ -76,7 +76,10 @@
             <path id="wave-path" d="M0 100 L1000 100" vector-effect="non-scaling-stroke"/>
           </svg>
         </div>
-        <p class="screen-foot">Alarm type <span id="current-type" class="screen-type"></span></p>
+        <div class="screen-foot">
+          <p>Alarm type <span id="current-type" class="screen-type"></span></p>
+          <p id="pico" class="pico" data-state="unknown" role="status"><span class="pico-dot"></span><span id="pico-text"></span></p>
+        </div>
       </section>
 
       <!-- The knob: turn it to choose an alarm type, press its cap to set it -->

@@ -14,13 +14,11 @@ Connecting to the broker blocks for a few seconds (TLS), so service(busy=True) s
 while the shaker plays.
 """
 import gc
-import machine
 import network
 import ntptime
 import rp2
 import ssl
 import time
-from binascii import hexlify
 
 from umqtt.simple import MQTTClient, MQTTException
 
@@ -136,7 +134,7 @@ def _go_online():
     gc.collect()   # TLS needs a big block of memory, and reconnecting can leave it fragmented
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.verify_mode = ssl.CERT_NONE   # encrypted, but the broker's certificate isn't checked yet
-    client_id = "shakeawake-" + hexlify(machine.unique_id()).decode()
+    client_id = "shakeawake-" + env.DEVICE_ID   # the Worker asks EMQX about this id (online or not)
     # Passing an SSLContext makes umqtt send the host name (SNI), which EMQX Serverless requires.
     client = MQTTClient(client_id, env.MQTT_HOST, port=env.MQTT_PORT, user=env.PICO_MQTT_USER,
                         password=env.PICO_MQTT_PASS, keepalive=KEEPALIVE_S, ssl=context)
